@@ -324,6 +324,27 @@ public static class Strings
             "Agent bağlantıları, web siteleri ve Minecraft hepsi kontrol portuna gelir; böylece yalnızca o tek portun açık olması yeterlidir. Bu durumda ziyaretçiler web sitelerine 443 yerine o porttan erişir (önünde eşleme yapan bir şey yoksa). Kendi genel portu olan tüneller bundan etkilenmez, onlar portlarını kullanmaya devam eder."),
         ["SinglePortActive"] = new("Only this port needs to be open:", "Yalnızca bu portun açık olması yeterli:"),
 
+        ["SectionPublicTls"] = new("PUBLIC HTTPS CERTIFICATE", "GENEL HTTPS SERTİFİKASI"),
+        ["PublicTlsHint"] = new(
+            "Optional PKCS#12 (.pfx/.p12) certificate used for public HTTPS. If none is imported, CaYaTunnel uses its generated self-signed certificate.",
+            "Genel HTTPS için isteğe bağlı PKCS#12 (.pfx/.p12) sertifikası. İçeri aktarılmazsa CaYaTunnel oluşturduğu kendinden imzalı sertifikayı kullanır."),
+        ["PublicTlsPassword"] = new("Certificate password", "Sertifika parolası"),
+        ["PublicTlsPasswordHint"] = new(
+            "Enter the PFX/P12 password before importing. Leave empty for a passwordless certificate.",
+            "İçe aktarmadan önce PFX/P12 parolasını gir. Parolasız sertifika için boş bırak."),
+        ["ImportPublicTlsCertificate"] = new("Import PFX/P12…", "PFX/P12 içeri aktar…"),
+        ["ImportPublicTlsPemCertificate"] = new("Select PEM certificate", "PEM sertifikasını seç"),
+        ["ImportPublicTlsPrivateKey"] = new("Select PEM private key", "PEM private key dosyasını seç"),
+        ["ImportPublicTlsPemButton"] = new("Import Cloudflare PEM + private key…", "Cloudflare PEM + private key içeri aktar…"),
+        ["PublicTlsPemImportSuccess"] = new("PEM certificate and private key imported. Save settings to apply them.", "PEM sertifikası ve private key içeri aktarıldı. Uygulamak için ayarları kaydet."),
+        ["ClearPublicTlsCertificate"] = new("Use automatic certificate", "Otomatik sertifikayı kullan"),
+        ["PublicTlsAutomaticCertificate"] = new("Automatic self-signed certificate", "Otomatik kendinden imzalı sertifika"),
+        ["PublicTlsCertificateLoaded"] = new("{0} — expires {1}", "{0} — son geçerlilik {1}"),
+        ["PublicTlsPrivateKeyRequired"] = new("The certificate must include its private key.", "Sertifika özel anahtarını da içermelidir."),
+        ["PublicTlsImportSuccess"] = new("Public HTTPS certificate imported. Save settings to apply it.", "Genel HTTPS sertifikası içeri aktarıldı. Uygulamak için ayarları kaydet."),
+        ["PublicTlsImportFailed"] = new("Could not import certificate: {0}", "Sertifika içeri aktarılamadı: {0}"),
+        ["PublicTlsCleared"] = new("The generated certificate will be used after saving.", "Kaydettikten sonra oluşturulan otomatik sertifika kullanılacak."),
+
         // ---- Firewall ----
         ["SectionFirewall"] = new("WINDOWS FIREWALL", "WINDOWS GÜVENLİK DUVARI"),
         ["FirewallHint"] = new(

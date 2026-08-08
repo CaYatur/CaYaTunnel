@@ -20,6 +20,13 @@ public static class ServerPaths
 
     public static string PublicCertificateFile => Path.Combine(DataDirectory, "public-tls.pfx");
 
+    /// <summary>
+    /// Operator-imported public HTTPS certificate. Kept separate from the generated certificate
+    /// so switching back to automatic TLS never destroys the imported file and importing a bad
+    /// certificate cannot overwrite the known-good fallback.
+    /// </summary>
+    public static string ImportedPublicCertificateFile => Path.Combine(DataDirectory, "public-tls-imported.pfx");
+
     /// <summary>Prebuilt client executable that provisioning copies and appends config to.</summary>
     public static string ClientStubFile => Path.Combine(DataDirectory, "stub", "CaYaTunnel.Client.exe");
 

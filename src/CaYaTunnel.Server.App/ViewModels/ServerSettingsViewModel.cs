@@ -1,8 +1,11 @@
+using System.IO;
+using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using CaYaTunnel.Core.Protocol;
 using CaYaTunnel.Server.Configuration;
 using CaYaTunnel.Server.Gateway;
 using CaYaTunnel.Ui;
+using Microsoft.Win32;
 
 namespace CaYaTunnel.Server.App.ViewModels;
 
@@ -42,6 +45,9 @@ public sealed class ServerSettingsViewModel : ViewModelBase
 
         ApplyFirewallCommand = new RelayCommand(ApplyFirewall, () => FirewallManager.CanManage);
         RemoveFirewallCommand = new RelayCommand(RemoveFirewall, () => FirewallManager.CanManage);
+        ImportPublicTlsCommand = new RelayCommand(ImportPublicTlsCertificate);
+        ImportPublicTlsPemCommand = new RelayCommand(ImportPublicTlsPemCertificate);
+        ClearPublicTlsCommand = new RelayCommand(ClearPublicTlsCertificate, () => !string.IsNullOrWhiteSpace(_draft.PublicTlsCertificatePath));
     }
 
     public AsyncRelayCommand SaveCommand { get; }
@@ -57,6 +63,12 @@ public sealed class ServerSettingsViewModel : ViewModelBase
     public RelayCommand ApplyFirewallCommand { get; }
 
     public RelayCommand RemoveFirewallCommand { get; }
+
+    public RelayCommand ImportPublicTlsCommand { get; }
+
+    public RelayCommand ImportPublicTlsPemCommand { get; }
+
+    public RelayCommand ClearPublicTlsCommand { get; }
 
     // ---- Firewall ------------------------------------------------------------------
 
@@ -168,6 +180,162 @@ public sealed class ServerSettingsViewModel : ViewModelBase
     {
         get => _draft.TcpPortRangeEnd.ToString();
         set { if (int.TryParse(value, out var port)) { _draft.TcpPortRangeEnd = port; } Raise(); }
+    }
+
+    // ---- Public HTTPS certificate -------------------------------------------------
+
+    public string PublicTlsCertificatePassword
+    {
+        get => _draft.PublicTlsCertificatePassword;
+        set
+        {
+            _draft.PublicTlsCertificatePassword = value;
+            Raise();
+            Raise(nameof(PublicTlsCertificateSummary));
+        }
+    }
+
+    public bool HasImportedPublicTlsCertificate => !string.IsNullOrWhiteSpace(_draft.PublicTlsCertificatePath);
+
+    public string PublicTlsCertificateSummary
+    {
+        get
+        {
+            if (!HasImportedPublicTlsCertificate)
+            {
+                return Loc.Get("PublicTlsAutomaticCertificate");
+            }
+
+            try
+            {
+                using var certificate = X509CertificateLoader.LoadPkcs12FromFile(
+                    _draft.PublicTlsCertificatePath,
+                    string.IsNullOrEmpty(_draft.PublicTlsCertificatePassword) ? null : _draft.PublicTlsCertificatePassword,
+                    X509KeyStorageFlags.EphemeralKeySet);
+
+                return Loc.Format("PublicTlsCertificateLoaded", certificate.Subject, certificate.NotAfter.ToShortDateString());
+            }
+            catch
+            {
+                return Path.GetFileName(_draft.PublicTlsCertificatePath);
+            }
+        }
+    }
+
+    private void ImportPublicTlsCertificate()
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = Loc.Get("ImportPublicTlsCertificate"),
+            Filter = "PKCS#12 certificate (*.pfx;*.p12)|*.pfx;*.p12|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            using var certificate = X509CertificateLoader.LoadPkcs12FromFile(
+                dialog.FileName,
+                string.IsNullOrEmpty(_draft.PublicTlsCertificatePassword) ? null : _draft.PublicTlsCertificatePassword,
+                X509KeyStorageFlags.EphemeralKeySet);
+
+            if (!certificate.HasPrivateKey)
+            {
+                throw new InvalidOperationException(Loc.Get("PublicTlsPrivateKeyRequired"));
+            }
+
+            Directory.CreateDirectory(ServerPaths.DataDirectory);
+            var destination = ServerPaths.ImportedPublicCertificateFile;
+            if (!Path.GetFullPath(dialog.FileName).Equals(Path.GetFullPath(destination), StringComparison.OrdinalIgnoreCase))
+            {
+                File.Copy(dialog.FileName, destination, overwrite: true);
+            }
+
+            _draft.PublicTlsCertificatePath = destination;
+            Raise(nameof(HasImportedPublicTlsCertificate));
+            Raise(nameof(PublicTlsCertificateSummary));
+            ClearPublicTlsCommand.RaiseCanExecuteChanged();
+            SetMessage(Loc.Get("PublicTlsImportSuccess"), false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(Loc.Format("PublicTlsImportFailed", ex.Message), true);
+        }
+    }
+
+    private void ImportPublicTlsPemCertificate()
+    {
+        var certificateDialog = new OpenFileDialog
+        {
+            Title = Loc.Get("ImportPublicTlsPemCertificate"),
+            Filter = "PEM certificate (*.pem;*.crt;*.cer)|*.pem;*.crt;*.cer|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (certificateDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        var keyDialog = new OpenFileDialog
+        {
+            Title = Loc.Get("ImportPublicTlsPrivateKey"),
+            Filter = "PEM private key (*.pem;*.key)|*.pem;*.key|All files (*.*)|*.*",
+            CheckFileExists = true,
+            Multiselect = false,
+        };
+
+        if (keyDialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        try
+        {
+            using var certificate = X509Certificate2.CreateFromPemFile(certificateDialog.FileName, keyDialog.FileName);
+            if (!certificate.HasPrivateKey)
+            {
+                throw new InvalidOperationException(Loc.Get("PublicTlsPrivateKeyRequired"));
+            }
+
+            Directory.CreateDirectory(ServerPaths.DataDirectory);
+            var destination = ServerPaths.ImportedPublicCertificateFile;
+            var exportPassword = string.IsNullOrEmpty(_draft.PublicTlsCertificatePassword)
+                ? Convert.ToHexString(Guid.NewGuid().ToByteArray())
+                : _draft.PublicTlsCertificatePassword;
+
+            var pfxBytes = certificate.Export(X509ContentType.Pfx, exportPassword);
+            File.WriteAllBytes(destination, pfxBytes);
+
+            _draft.PublicTlsCertificatePath = destination;
+            _draft.PublicTlsCertificatePassword = exportPassword;
+            Raise(nameof(PublicTlsCertificatePassword));
+            Raise(nameof(HasImportedPublicTlsCertificate));
+            Raise(nameof(PublicTlsCertificateSummary));
+            ClearPublicTlsCommand.RaiseCanExecuteChanged();
+            SetMessage(Loc.Get("PublicTlsPemImportSuccess"), false);
+        }
+        catch (Exception ex)
+        {
+            SetMessage(Loc.Format("PublicTlsImportFailed", ex.Message), true);
+        }
+    }
+
+    private void ClearPublicTlsCertificate()
+    {
+        _draft.PublicTlsCertificatePath = "";
+        _draft.PublicTlsCertificatePassword = "";
+        Raise(nameof(PublicTlsCertificatePassword));
+        Raise(nameof(HasImportedPublicTlsCertificate));
+        Raise(nameof(PublicTlsCertificateSummary));
+        ClearPublicTlsCommand.RaiseCanExecuteChanged();
+        SetMessage(Loc.Get("PublicTlsCleared"), false);
     }
 
     // ---- DNS ---------------------------------------------------------------------

@@ -548,6 +548,28 @@
                         </StackPanel>
                       </Border>
 
+                      <TextBlock Text="{ui:L SectionPublicTls}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <TextBlock Text="{ui:L PublicTlsHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,12" />
+                          <TextBlock Text="{Binding PublicTlsCertificateSummary}" Style="{StaticResource MutedText}"
+                                     TextWrapping="Wrap" Margin="0,0,0,12" />
+                          <TextBlock Text="{ui:L PublicTlsPassword}" Style="{StaticResource FieldLabel}" />
+                          <TextBox Style="{StaticResource FieldInput}" Width="280" HorizontalAlignment="Left"
+                                   Text="{Binding PublicTlsCertificatePassword, UpdateSourceTrigger=PropertyChanged}" />
+                          <TextBlock Text="{ui:L PublicTlsPasswordHint}" Style="{StaticResource FieldHint}" Margin="0,5,0,12" />
+                          <WrapPanel>
+                            <Button Style="{StaticResource SecondaryButton}" Content="{ui:L ImportPublicTlsCertificate}"
+                                    Command="{Binding ImportPublicTlsCommand}" Margin="0,0,10,8" />
+                            <Button Style="{StaticResource SecondaryButton}" Content="{ui:L ImportPublicTlsPemButton}"
+                                    Command="{Binding ImportPublicTlsPemCommand}" Margin="0,0,10,8" />
+                            <Button Style="{StaticResource LinkButton}" Content="{ui:L ClearPublicTlsCertificate}"
+                                    Command="{Binding ClearPublicTlsCommand}" Margin="0,0,0,8"
+                                    Visibility="{Binding HasImportedPublicTlsCertificate, Converter={StaticResource BoolToVisibility}}" />
+                          </WrapPanel>
+                        </StackPanel>
+                      </Border>
+
                       <TextBlock Text="{ui:L SectionDns}" Style="{StaticResource SectionLabel}" />
                       <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                         <StackPanel>
