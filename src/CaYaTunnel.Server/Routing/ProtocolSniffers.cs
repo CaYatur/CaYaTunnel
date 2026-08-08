@@ -124,6 +124,25 @@ public static class ProtocolSniffers
         }
     }
 
+    /// <summary>
+    /// True when the bytes open with an HTTP request line. Used to tell plaintext HTTP apart
+    /// from the other protocols sharing a port, before any of it is parsed.
+    /// </summary>
+    public static bool LooksLikeHttp(ReadOnlySpan<byte> data)
+    {
+        ReadOnlySpan<string> methods = ["GET ", "POST ", "PUT ", "HEAD ", "DELETE ", "OPTIONS ", "PATCH ", "TRACE ", "CONNECT "];
+
+        foreach (var method in methods)
+        {
+            if (data.Length >= method.Length && Encoding.ASCII.GetString(data[..method.Length]) == method)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>True once the buffer holds a complete HTTP header block.</summary>
     public static bool HasCompleteHttpHead(ReadOnlySpan<byte> data)
         => data.IndexOf("\r\n\r\n"u8) >= 0 || data.IndexOf("\n\n"u8) >= 0;

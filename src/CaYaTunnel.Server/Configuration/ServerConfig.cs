@@ -39,6 +39,22 @@ public sealed class ServerConfig
 
     // ---- Public listeners --------------------------------------------------
 
+    /// <summary>
+    /// Serve agent links, HTTP, HTTPS and Minecraft all on <see cref="ControlPort"/>.
+    /// <para>
+    /// Everything that announces where it is going can share one port, because the gateway can
+    /// read that from the first bytes: agent links by their TLS server name, websites by SNI or
+    /// Host, Minecraft by its handshake. Tunnels with a dedicated public port are the exception
+    /// and still need their own — a protocol that carries no destination cannot be told apart
+    /// from any other, so the port number has to be the destination.
+    /// </para>
+    /// <para>
+    /// The trade is that visitors reach websites on the control port rather than 443, unless
+    /// something in front (Cloudflare, a load balancer) maps it.
+    /// </para>
+    /// </summary>
+    public bool SinglePortMode { get; set; }
+
     public bool EnableHttpRouter { get; set; } = true;
 
     public int HttpPort { get; set; } = 80;
@@ -130,6 +146,13 @@ public sealed class ServerConfig
     public IEnumerable<(string Name, int Port)> ReservedPorts()
     {
         yield return ("control port", ControlPort);
+
+        // In single-port mode nothing else is bound, so nothing else is reserved and the whole
+        // range stays available to tunnels.
+        if (SinglePortMode)
+        {
+            yield break;
+        }
 
         if (EnableHttpRouter)
         {

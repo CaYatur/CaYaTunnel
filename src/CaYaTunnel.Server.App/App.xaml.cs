@@ -12,6 +12,20 @@ public partial class App : Application
 {
     private ServerShellViewModel? _shell;
     private SingleInstance? _instance;
+    private TrayPresence? _tray;
+
+    /// <summary>True once the user chose Exit, so the window stops bouncing back to the tray.</summary>
+    public static bool IsExiting => (Current as App)?._tray?.IsExiting ?? false;
+
+    /// <summary>Shown the first time the window is closed, so the gateway is not assumed gone.</summary>
+    public static void AnnounceStillRunning()
+    {
+        if (Current is App { _tray: { } tray })
+        {
+            tray.Notify(Loc.Get("StillRunningTitle"), Loc.Get("StillRunningBodyServer"),
+                System.Windows.Forms.ToolTipIcon.Info);
+        }
+    }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -42,7 +56,15 @@ public partial class App : Application
         MainWindow = window;
         window.Show();
 
-        _instance!.SecondInstanceAttempted += () => WindowActivation.BringToFront(window);
+        // The gateway keeps serving with the window closed, so it needs somewhere to live and a
+        // way back — without this, closing the window left a process nobody could reach.
+        _tray = new TrayPresence(window, Loc.Get("AppServer"), () => _shell.IsRunning);
+        _shell.StateChanged += () => _tray.Refresh(
+            _shell.IsRunning
+                ? $"{Loc.Get("GatewayRunning")} · {_shell.TunnelCount} {Loc.Get("TunnelCount")}"
+                : Loc.Get("GatewayStopped"));
+
+        _instance!.SecondInstanceAttempted += () => _tray.Show();
 
         if (_shell.Config.AutoStartGateway)
         {
@@ -52,7 +74,13 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
-        _shell?.ShutdownAsync().GetAwaiter().GetResult();
+        _tray?.Dispose();
+
+        if (_shell is { } shell)
+        {
+            ShutdownGuard.Run(shell.ShutdownAsync);
+        }
+
         _instance?.Dispose();
         base.OnExit(e);
     }

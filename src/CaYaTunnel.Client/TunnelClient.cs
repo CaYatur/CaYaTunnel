@@ -252,7 +252,11 @@ public sealed class TunnelClient : IAsyncDisposable
             await tls.AuthenticateAsClientAsync(
                 new SslClientAuthenticationOptions
                 {
-                    TargetHost = _profile.ServerHost,
+                    // A fixed name rather than the server's: it identifies this as a control
+                    // link, which is what lets the gateway share one port with public HTTPS.
+                    // Certificate validation is by pinned fingerprint, so the name is not used
+                    // for trust and choosing it freely costs nothing.
+                    TargetHost = ProtocolConstants.ControlSniName,
                     EnabledSslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                 },
                 handshakeTimeout.Token).ConfigureAwait(false);

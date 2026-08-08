@@ -29,6 +29,15 @@ public static class Strings
         ["Yes"] = new("Yes", "Evet"),
         ["No"] = new("No", "Hayır"),
         ["Open"] = new("Open", "Aç"),
+        ["OpenWindow"] = new("Open CaYaTunnel", "CaYaTunnel'ı aç"),
+        ["ExitApp"] = new("Exit", "Çık"),
+        ["StillRunningTitle"] = new("Still running", "Çalışmaya devam ediyor"),
+        ["StillRunningBodyClient"] = new(
+            "CaYaTunnel is in the tray and your tunnels stay up. Right-click the icon to exit.",
+            "CaYaTunnel sistem tepsisinde ve tünellerin açık kalmaya devam ediyor. Çıkmak için ikona sağ tıkla."),
+        ["StillRunningBodyServer"] = new(
+            "The gateway is in the tray and keeps serving tunnels. Right-click the icon to exit.",
+            "Ağ geçidi sistem tepsisinde ve tünelleri sunmaya devam ediyor. Çıkmak için ikona sağ tıkla."),
         ["Browse"] = new("Browse…", "Gözat…"),
         ["Never"] = new("Never", "Hiç"),
         ["Unknown"] = new("Unknown", "Bilinmiyor"),
@@ -75,6 +84,37 @@ public static class Strings
         ["LastActive"] = new("Last used", "Son kullanım"),
         ["TunnelDisabled"] = new("Disabled", "Devre dışı"),
         ["DeviceOffline"] = new("Device offline", "Cihaz çevrimdışı"),
+        ["Edit"] = new("Edit", "Düzenle"),
+        ["EditTunnelTitle"] = new("Edit tunnel", "Tüneli düzenle"),
+        ["TunnelEnabled"] = new("Enabled", "Etkin"),
+        ["PublicAddressFixed"] = new(
+            "The public address cannot be changed here — that would be a different endpoint, and anyone already using this one would lose it. Delete and create a new tunnel instead.",
+            "Genel adres burada değiştirilemez — bu farklı bir adres olurdu ve mevcut adresi kullananlar erişimini kaybederdi. Bunun yerine sil ve yeni bir tünel oluştur."),
+
+        // ---- Connection test ----
+        ["TestTunnel"] = new("Test", "Test et"),
+        ["Testing"] = new("Testing…", "Test ediliyor…"),
+        ["TestTargetOk"] = new("The local service answered.", "Yerel servis yanıt verdi."),
+        ["TestTargetFailed"] = new(
+            "Could not reach the local service. It is the target that is down, not the tunnel.",
+            "Yerel servise ulaşılamadı. Sorun tünelde değil, hedef serviste."),
+        ["TestPublicOk"] = new("The public address is reachable.", "Genel adrese erişilebiliyor."),
+        ["TestPublicFailed"] = new(
+            "The public address did not answer. Check that the port is open on the server's firewall and that DNS points at it.",
+            "Genel adres yanıt vermedi. Portun sunucunun güvenlik duvarında açık olduğunu ve DNS'in oraya işaret ettiğini kontrol et."),
+        ["TestPublicSkipped"] = new(
+            "The public address was not tested because the local service is down — it would fail for that reason alone.",
+            "Yerel servis çalışmadığı için genel adres test edilmedi — yalnızca bu yüzden başarısız olurdu."),
+        ["TestRouted"] = new(
+            "Traffic reached the local service through the tunnel end to end.",
+            "Trafik tünel üzerinden uçtan uca yerel servise ulaştı."),
+        ["TestWrongTarget"] = new(
+            "The gateway answered but the traffic did not reach this tunnel's service. Check the hostname or port.",
+            "Ağ geçidi yanıt verdi ama trafik bu tünelin servisine ulaşmadı. Alan adını veya portu kontrol et."),
+        ["TestOfflineDevice"] = new(
+            "The device carrying this tunnel is offline, so nothing can reach it.",
+            "Bu tüneli taşıyan cihaz çevrimdışı, bu yüzden ona hiçbir şey ulaşamaz."),
+
         ["ConfirmDeleteTunnel"] = new(
             "Delete this tunnel? Its public address stops working immediately.",
             "Bu tünel silinsin mi? Genel adresi anında çalışmayı bırakır."),
@@ -267,6 +307,24 @@ public static class Strings
         ["FieldBaseDomainHint"] = new(
             "Hostname tunnels are created under this, e.g. tunnel.example.com. Leave empty to use ports only.",
             "Alan adlı tüneller bunun altında oluşturulur, örn. tunnel.example.com. Yalnızca port kullanmak için boş bırak."),
+        ["SinglePortMode"] = new("Share one port for everything possible", "Mümkün olan her şeyi tek portta topla"),
+        ["SinglePortModeHint"] = new(
+            "Agent links, websites and Minecraft all arrive on the control port, so only that one port has to be open. Visitors then reach websites on that port rather than 443, unless something in front maps it. Tunnels with their own public port are unaffected and still need theirs.",
+            "Agent bağlantıları, web siteleri ve Minecraft hepsi kontrol portuna gelir; böylece yalnızca o tek portun açık olması yeterlidir. Bu durumda ziyaretçiler web sitelerine 443 yerine o porttan erişir (önünde eşleme yapan bir şey yoksa). Kendi genel portu olan tüneller bundan etkilenmez, onlar portlarını kullanmaya devam eder."),
+        ["SinglePortActive"] = new("Only this port needs to be open:", "Yalnızca bu portun açık olması yeterli:"),
+
+        // ---- Firewall ----
+        ["SectionFirewall"] = new("WINDOWS FIREWALL", "WINDOWS GÜVENLİK DUVARI"),
+        ["FirewallHint"] = new(
+            "Creates inbound rules for exactly the ports this configuration uses. Rules are tagged as CaYaTunnel's, so removing them never touches anything else.",
+            "Bu yapılandırmanın kullandığı portlar için tam olarak gelen kural oluşturur. Kurallar CaYaTunnel etiketiyle işaretlenir, kaldırma işlemi başka hiçbir şeye dokunmaz."),
+        ["FirewallApply"] = new("Create rules", "Kuralları oluştur"),
+        ["FirewallRemove"] = new("Remove rules", "Kuralları kaldır"),
+        ["FirewallWillOpen"] = new("Will open:", "Açılacak:"),
+        ["FirewallNeedsAdmin"] = new(
+            "Managing firewall rules needs administrator rights.",
+            "Güvenlik duvarı kurallarını yönetmek için yönetici hakkı gerekir."),
+
         ["EnableHttpRouter"] = new("HTTP and HTTPS router", "HTTP ve HTTPS yönlendirici"),
         ["EnableMinecraftRouter"] = new("Minecraft router", "Minecraft yönlendirici"),
         ["FieldHttpPort"] = new("HTTP port", "HTTP portu"),

@@ -208,7 +208,7 @@ public sealed partial class TunnelServer : IAsyncDisposable
             while (!cancellationToken.IsCancellationRequested)
             {
                 var client = await listener.AcceptTcpClientAsync(cancellationToken).ConfigureAwait(false);
-                _ = Task.Run(() => HandleControlConnectionAsync(client, cancellationToken), CancellationToken.None);
+                _ = Task.Run(() => AcceptControlPortAsync(client, cancellationToken), CancellationToken.None);
             }
         }
         catch (OperationCanceledException)
@@ -225,16 +225,47 @@ public sealed partial class TunnelServer : IAsyncDisposable
         }
     }
 
-    private async Task HandleControlConnectionAsync(TcpClient client, CancellationToken cancellationToken)
+    /// <summary>
+    /// Takes a connection on the control port. In single-port mode this is also where public
+    /// traffic arrives, so the first bytes decide what it is before anything else happens.
+    /// </summary>
+    private async Task AcceptControlPortAsync(TcpClient client, CancellationToken cancellationToken)
     {
         var remote = client.Client.RemoteEndPoint as IPEndPoint;
-        SslStream? tls = null;
 
         try
         {
             client.NoDelay = true;
 
-            tls = new SslStream(client.GetStream(), leaveInnerStreamOpen: false);
+            if (!Config.SinglePortMode)
+            {
+                await HandleControlConnectionAsync(client.GetStream(), remote, cancellationToken).ConfigureAwait(false);
+                return;
+            }
+
+            await RouteSharedPortAsync(client.GetStream(), remote, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException)
+        {
+            Log.Debug("control", $"Connection from {remote} ended: {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            Log.Error("control", $"Unexpected failure handling {remote}", ex);
+        }
+        finally
+        {
+            client.Dispose();
+        }
+    }
+
+    private async Task HandleControlConnectionAsync(Stream transport, IPEndPoint? remote, CancellationToken cancellationToken)
+    {
+        SslStream? tls = null;
+
+        try
+        {
+            tls = new SslStream(transport, leaveInnerStreamOpen: false);
 
             using var handshakeTimeout = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             handshakeTimeout.CancelAfter(ProtocolConstants.HandshakeTimeout);
@@ -284,8 +315,6 @@ public sealed partial class TunnelServer : IAsyncDisposable
             {
                 await tls.DisposeAsync().ConfigureAwait(false);
             }
-
-            client.Dispose();
         }
     }
 

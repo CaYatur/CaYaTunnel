@@ -13,8 +13,11 @@ public partial class App : Application
     public const string StartHiddenSwitch = "--hidden";
 
     private ShellViewModel? _shell;
-    private TrayIcon? _tray;
+    private TrayPresence? _tray;
     private SingleInstance? _instance;
+
+    /// <summary>True once the user chose Exit, so the window stops bouncing back to the tray.</summary>
+    public static bool IsExiting => (Current as App)?._tray?.IsExiting ?? false;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -57,10 +60,25 @@ public partial class App : Application
         var window = new MainWindow { DataContext = _shell };
         MainWindow = window;
 
-        _tray = new TrayIcon(_shell, window);
+        _tray = new TrayPresence(window, Loc.Get("AppClient"), () => _shell.IsOnline);
+        _shell.StateChanged += () => _tray.Refresh(BuildTrayStatus(_shell));
+        _shell.NoticeRaised += notice =>
+        {
+            if (!_shell.Settings.ShowNotifications)
+            {
+                return;
+            }
+
+            _tray.Notify(notice.Title, notice.Body, notice.Severity switch
+            {
+                "error" => System.Windows.Forms.ToolTipIcon.Error,
+                "warning" => System.Windows.Forms.ToolTipIcon.Warning,
+                _ => System.Windows.Forms.ToolTipIcon.Info,
+            });
+        };
 
         // Launching again is how a user asks for the window back when it is hidden in the tray.
-        _instance!.SecondInstanceAttempted += () => WindowActivation.BringToFront(window);
+        _instance!.SecondInstanceAttempted += () => _tray.Show();
 
         // Launching hidden is the normal case for "start with Windows": the agent should just
         // be there in the tray, not steal focus every sign-in.
@@ -80,10 +98,31 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        // The tray icon goes first: leaving a dead icon behind while the rest winds down is the
+        // most visible way an exit can look broken.
         _tray?.Dispose();
-        _shell?.ShutdownAsync().GetAwaiter().GetResult();
+
+        if (_shell is { } shell)
+        {
+            ShutdownGuard.Run(shell.ShutdownAsync);
+        }
+
         _instance?.Dispose();
         base.OnExit(e);
+    }
+
+    private static string BuildTrayStatus(ShellViewModel shell) => shell.IsOnline
+        ? $"{Loc.Get("StateOnline")} · {shell.TunnelCount} {Loc.Get("TunnelCount")}"
+        : shell.StatusLabel;
+
+    /// <summary>Shown the first time the window is closed, so the app is not assumed to be gone.</summary>
+    public static void AnnounceStillRunning()
+    {
+        if (Current is App { _tray: { } tray })
+        {
+            tray.Notify(Loc.Get("StillRunningTitle"), Loc.Get("StillRunningBodyClient"),
+                System.Windows.Forms.ToolTipIcon.Info);
+        }
     }
 
     /// <summary>

@@ -6,17 +6,50 @@ namespace CaYaTunnel.Server.App.Views;
 
 public partial class MainWindow : Window
 {
-    public MainWindow() => InitializeComponent();
+    public MainWindow()
+    {
+        InitializeComponent();
+        DataContextChanged += (_, e) =>
+        {
+            if (e.NewValue is ViewModels.ServerShellViewModel shell)
+            {
+                shell.EditTunnelRequested += row => new EditTunnelDialog
+                {
+                    Owner = this,
+                    DataContext = new ViewModels.EditTunnelViewModel(shell, row),
+                }.ShowDialog();
+            }
+        };
+    }
+
+    private bool _announcedTray;
 
     /// <summary>
-    /// Shutdown is explicit rather than tied to this window closing.
-    /// <para>
-    /// The capture mode opens and closes several windows from inside OnStartup, and letting the
-    /// first close begin an application shutdown while Run has not been entered yet deadlocks the
-    /// dispatcher. The admin window quits the app itself instead — but only when it is the real
-    /// one, which is the case whenever the app has a shell attached.
-    /// </para>
+    /// Closing the window puts the gateway in the tray rather than stopping it: tunnels that are
+    /// carrying traffic should not drop because someone tidied their desktop. Exit lives in the
+    /// tray menu, which sets IsExiting and lets this close go through.
     /// </summary>
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        // Only the real admin window minimises. Capture mode opens and closes windows of its own,
+        // and those must close for real.
+        if (!App.IsExiting && ReferenceEquals(Application.Current?.MainWindow, this))
+        {
+            e.Cancel = true;
+            Hide();
+
+            if (!_announcedTray)
+            {
+                _announcedTray = true;
+                App.AnnounceStillRunning();
+            }
+
+            return;
+        }
+
+        base.OnClosing(e);
+    }
+
     protected override void OnClosed(EventArgs e)
     {
         base.OnClosed(e);

@@ -28,10 +28,106 @@ public sealed partial class TunnelServer
     private readonly ConcurrentDictionary<int, PortListener> _portListeners = new();
     private CancellationTokenSource? _publicShutdown;
 
+    /// <summary>
+    /// Serves a connection that arrived on the shared control port. Everything that announces
+    /// where it is going can be told apart here, which is what lets one open port carry agent
+    /// links and public traffic at once.
+    /// </summary>
+    private async Task RouteSharedPortAsync(Stream client, IPEndPoint? remote, CancellationToken cancellationToken)
+    {
+        var prefix = await StreamPeeker.PeekAsync(
+            client,
+            SniffBufferSize,
+            data => Classify(data.Span) != SharedPortProtocol.Unknown || data.Length >= 4096,
+            SniffTimeout,
+            cancellationToken).ConfigureAwait(false);
+
+        if (prefix.Length == 0)
+        {
+            return;
+        }
+
+        var kind = Classify(prefix);
+
+        // The peeked bytes are replayed, so each handler reads the connection from its start and
+        // needs no knowledge that anything looked at it first.
+        var stream = new PrefixedStream(client, prefix);
+
+        switch (kind)
+        {
+            case SharedPortProtocol.Control:
+                await HandleControlConnectionAsync(stream, remote, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case SharedPortProtocol.Https:
+                await RouteHttpAsync(stream, remote, secure: true, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case SharedPortProtocol.Http:
+                await RouteHttpAsync(stream, remote, secure: false, cancellationToken).ConfigureAwait(false);
+                break;
+
+            case SharedPortProtocol.Minecraft:
+                await RouteHostAwareTcpAsync(stream, remote, cancellationToken).ConfigureAwait(false);
+                break;
+
+            default:
+                Log.Debug("gateway", $"{remote} sent something unrecognised on the shared port.");
+                break;
+        }
+    }
+
+    private enum SharedPortProtocol
+    {
+        Unknown,
+        Control,
+        Https,
+        Http,
+        Minecraft,
+    }
+
+    private static SharedPortProtocol Classify(ReadOnlySpan<byte> data)
+    {
+        if (ProtocolSniffers.LooksLikeTls(data))
+        {
+            var sni = ProtocolSniffers.ReadTlsSni(data);
+            if (sni is null)
+            {
+                return SharedPortProtocol.Unknown; // incomplete hello; keep reading
+            }
+
+            return string.Equals(sni, ProtocolConstants.ControlSniName, StringComparison.OrdinalIgnoreCase)
+                ? SharedPortProtocol.Control
+                : SharedPortProtocol.Https;
+        }
+
+        if (ProtocolSniffers.LooksLikeHttp(data))
+        {
+            return SharedPortProtocol.Http;
+        }
+
+        return ProtocolSniffers.ReadMinecraftHostname(data) is not null
+            ? SharedPortProtocol.Minecraft
+            : SharedPortProtocol.Unknown;
+    }
+
     private void StartPublicListeners(CancellationToken cancellationToken)
     {
         _publicShutdown = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _publicShutdown.Token;
+
+        // In single-port mode the control listener already serves HTTP, HTTPS and Minecraft, so
+        // binding them again would only fight itself for the ports.
+        if (Config.SinglePortMode)
+        {
+            foreach (var tunnel in Registry.Tunnels.Where(t => t.Kind == TunnelKind.PortForward && t.PublicPort.HasValue))
+            {
+                StartPortListener(tunnel);
+            }
+
+            Log.Info("gateway", $"Single-port mode: agent links, HTTP, HTTPS and Minecraft all share {Config.ControlPort}.");
+            return;
+        }
 
         if (Config.EnableHttpRouter)
         {

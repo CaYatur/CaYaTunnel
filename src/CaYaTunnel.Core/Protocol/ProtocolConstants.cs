@@ -12,6 +12,17 @@ public static class ProtocolConstants
     /// <summary>Magic bytes sent by the client immediately after the TLS handshake.</summary>
     public static ReadOnlySpan<byte> Preamble => "CYT1"u8;
 
+    /// <summary>
+    /// The TLS server name a client announces when opening its control link.
+    /// <para>
+    /// This is what lets one port carry both agent links and public HTTPS: the gateway reads the
+    /// name out of the ClientHello and knows which it is before anything else happens. The
+    /// .invalid suffix is reserved by RFC 2606 and can never be registered, so it can never
+    /// collide with a real tunnel hostname.
+    /// </para>
+    /// </summary>
+    public const string ControlSniName = "control.cayatunnel.invalid";
+
     /// <summary>Bytes on the wire before every frame payload.</summary>
     public const int HeaderSize = 10;
 

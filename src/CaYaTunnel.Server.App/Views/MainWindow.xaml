@@ -268,6 +268,9 @@
                         </StackPanel>
                       </StackPanel>
                       <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}" Content="{ui:L Edit}"
+                                Command="{Binding DataContext.EditTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
                         <Button Style="{StaticResource GhostButton}"
                                 Command="{Binding DataContext.ToggleTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}">
@@ -503,6 +506,13 @@
                       <TextBlock Text="{ui:L SectionListeners}" Style="{StaticResource SectionLabel}" />
                       <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                         <StackPanel>
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L SinglePortMode}"
+                                    IsChecked="{Binding SinglePortMode}" />
+                          <TextBlock Text="{ui:L SinglePortModeHint}" Style="{StaticResource FieldHint}" />
+
+                          <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,16" />
+
+                          <StackPanel Visibility="{Binding ShowsIndividualListeners, Converter={StaticResource BoolToVisibility}}">
                           <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L EnableHttpRouter}"
                                     IsChecked="{Binding EnableHttpRouter}" Margin="0,0,0,12" />
                           <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
@@ -524,6 +534,7 @@
                           <TextBox Style="{StaticResource FieldInput}" Width="120" HorizontalAlignment="Left"
                                    Margin="0,0,0,14"
                                    Text="{Binding MinecraftPort, UpdateSourceTrigger=PropertyChanged}" />
+                          </StackPanel>
 
                           <TextBlock Text="{ui:L FieldPortRange}" Style="{StaticResource FieldLabel}" />
                           <StackPanel Orientation="Horizontal">
@@ -572,6 +583,29 @@
                                          Visibility="{Binding DnsStatus, Converter={StaticResource StringToVisibility}}" />
                             </StackPanel>
                           </StackPanel>
+                        </StackPanel>
+                      </Border>
+
+                      <TextBlock Text="{ui:L SectionFirewall}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <TextBlock Text="{ui:L FirewallHint}" Style="{StaticResource SecondaryText}"
+                                     TextWrapping="Wrap" Margin="0,0,0,12" />
+
+                          <TextBlock Text="{ui:L FirewallWillOpen}" Style="{StaticResource FieldLabel}" />
+                          <TextBlock Text="{Binding FirewallPlan}" Style="{StaticResource MonoText}"
+                                     Foreground="{StaticResource TextSecondaryBrush}" />
+
+                          <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                            <Button Style="{StaticResource SecondaryButton}" Content="{ui:L FirewallApply}"
+                                    Command="{Binding ApplyFirewallCommand}" Margin="0,0,10,0" />
+                            <Button Style="{StaticResource GhostButton}" Content="{ui:L FirewallRemove}"
+                                    Command="{Binding RemoveFirewallCommand}" />
+                          </StackPanel>
+
+                          <TextBlock Text="{ui:L FirewallNeedsAdmin}" Style="{StaticResource FieldHint}"
+                                     Foreground="{StaticResource WarningBrush}"
+                                     Visibility="{Binding CanManageFirewall, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
                         </StackPanel>
                       </Border>
 

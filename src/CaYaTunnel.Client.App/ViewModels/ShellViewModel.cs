@@ -54,6 +54,10 @@ public sealed class ShellViewModel : ViewModelBase
         DeleteTunnelCommand = new AsyncRelayCommand(DeleteTunnelAsync, p => p is TunnelRow && IsOnline, ReportError);
         ToggleTunnelCommand = new AsyncRelayCommand(ToggleTunnelAsync, p => p is TunnelRow && IsOnline, ReportError);
         CopyEndpointCommand = new RelayCommand(CopyEndpoint, p => p is TunnelRow);
+        EditTunnelCommand = new RelayCommand(
+            p => { if (p is TunnelRow row) { EditTunnelRequested?.Invoke(row); } },
+            p => p is TunnelRow && IsOnline);
+        TestTunnelCommand = new AsyncRelayCommand(TestTunnelAsync, p => p is TunnelRow, ReportError);
         DismissBannerCommand = new RelayCommand(() => Banner = null);
         GoToCommand = new RelayCommand(p =>
         {
@@ -81,6 +85,9 @@ public sealed class ShellViewModel : ViewModelBase
     /// <summary>Raised when the user asks for the new-tunnel dialog; the view owns the window.</summary>
     public event Action? NewTunnelRequested;
 
+    /// <summary>Raised when the user asks to edit a tunnel; the view owns the window.</summary>
+    public event Action<TunnelRow>? EditTunnelRequested;
+
     public RelayCommand ConnectCommand { get; }
 
     public AsyncRelayCommand DisconnectCommand { get; }
@@ -94,6 +101,10 @@ public sealed class ShellViewModel : ViewModelBase
     public AsyncRelayCommand ToggleTunnelCommand { get; }
 
     public RelayCommand CopyEndpointCommand { get; }
+
+    public RelayCommand EditTunnelCommand { get; }
+
+    public AsyncRelayCommand TestTunnelCommand { get; }
 
     public RelayCommand DismissBannerCommand { get; }
 
@@ -204,10 +215,15 @@ public sealed class ShellViewModel : ViewModelBase
 
     public async Task DisconnectAsync() => await _client.StopAsync();
 
+    /// <summary>
+    /// Tears the agent down. Every await here is <c>ConfigureAwait(false)</c>: shutdown is
+    /// driven from the UI thread, and resuming on a thread that is waiting for this method to
+    /// finish is a deadlock — the process keeps running with no window and no way to close it.
+    /// </summary>
     public async Task ShutdownAsync()
     {
         _store.Save(Settings);
-        await _client.DisposeAsync();
+        await _client.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>Re-points the client at a different server after the user edits the settings.</summary>
@@ -277,6 +293,7 @@ public sealed class ShellViewModel : ViewModelBase
         NewTunnelCommand.RaiseCanExecuteChanged();
         DeleteTunnelCommand.RaiseCanExecuteChanged();
         ToggleTunnelCommand.RaiseCanExecuteChanged();
+        EditTunnelCommand.RaiseCanExecuteChanged();
 
         StateChanged?.Invoke();
     }
@@ -417,6 +434,74 @@ public sealed class ShellViewModel : ViewModelBase
         {
             ShowError(result.Error);
         }
+    }
+
+    public Task<ControlResult> UpdateTunnelAsync(UpdateTunnelRequest request) => _client.UpdateTunnelAsync(request);
+
+    /// <summary>
+    /// Tries the tunnel for real and reports what happened in the order the user would debug it:
+    /// the local service first, then the public address, then whether traffic actually landed
+    /// here rather than merely reaching the gateway.
+    /// </summary>
+    private async Task TestTunnelAsync(object? parameter)
+    {
+        if (parameter is not TunnelRow row || ServerInfo is not { } server)
+        {
+            return;
+        }
+
+        FlashToast(Loc.Get("Testing"));
+
+        var result = await TunnelTester.RunAsync(
+            row.Model,
+            server,
+            deviceOnline: row.DeviceOnline,
+            targetIsLocal: row.IsThisDevice);
+
+        BannerSeverity = result.LooksHealthy ? "info" : "warning";
+        Banner = $"{row.Name} — {row.Endpoint}";
+        BannerDetail = DescribeTest(result);
+        Toast = null;
+    }
+
+    private static string DescribeTest(TunnelTestResult result)
+    {
+        if (result.DeviceOffline)
+        {
+            return Loc.Get("TestOfflineDevice");
+        }
+
+        var lines = new List<string>();
+
+        if (result.TargetChecked)
+        {
+            lines.Add(result.TargetReachable ? Loc.Get("TestTargetOk") : Loc.Get("TestTargetFailed"));
+        }
+
+        if (result.TargetChecked && !result.TargetReachable)
+        {
+            lines.Add(Loc.Get("TestPublicSkipped"));
+            return string.Join("  ", lines);
+        }
+
+        if (result.PublicChecked)
+        {
+            if (result.PublicUdpNotTestable)
+            {
+                lines.Add(Loc.Get("UdpNote"));
+            }
+            else
+            {
+                lines.Add(result.PublicReachable ? Loc.Get("TestPublicOk") : Loc.Get("TestPublicFailed"));
+            }
+        }
+
+        if (result.RoutedCorrectly is { } routed)
+        {
+            lines.Add(routed ? Loc.Get("TestRouted") : Loc.Get("TestWrongTarget"));
+        }
+
+        return string.Join("  ", lines);
     }
 
     private void CopyEndpoint(object? parameter)

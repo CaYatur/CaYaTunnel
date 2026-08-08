@@ -39,6 +39,9 @@ public sealed class ServerSettingsViewModel : ViewModelBase
         InstallServiceCommand = new RelayCommand(InstallService);
         UninstallServiceCommand = new RelayCommand(UninstallService);
         RelaunchElevatedCommand = new RelayCommand(() => StartupManager.RelaunchElevated());
+
+        ApplyFirewallCommand = new RelayCommand(ApplyFirewall, () => FirewallManager.CanManage);
+        RemoveFirewallCommand = new RelayCommand(RemoveFirewall, () => FirewallManager.CanManage);
     }
 
     public AsyncRelayCommand SaveCommand { get; }
@@ -50,6 +53,37 @@ public sealed class ServerSettingsViewModel : ViewModelBase
     public RelayCommand UninstallServiceCommand { get; }
 
     public RelayCommand RelaunchElevatedCommand { get; }
+
+    public RelayCommand ApplyFirewallCommand { get; }
+
+    public RelayCommand RemoveFirewallCommand { get; }
+
+    // ---- Firewall ------------------------------------------------------------------
+
+    public bool CanManageFirewall => FirewallManager.CanManage;
+
+    public bool FirewallRulesExist => FirewallManager.RulesExist();
+
+    /// <summary>
+    /// Exactly what would be opened, listed before anything changes. Approving an invisible set
+    /// of firewall changes is not a decision anyone can actually make.
+    /// </summary>
+    public string FirewallPlan => string.Join("\n", FirewallManager.Plan(_draft)
+        .Select(rule => $"  •  {rule.Protocol} {rule.Ports}  —  {rule.Name}"));
+
+    private void ApplyFirewall()
+    {
+        var (ok, message) = FirewallManager.Apply(_draft);
+        SetMessage(message, !ok);
+        Raise(nameof(FirewallRulesExist));
+    }
+
+    private void RemoveFirewall()
+    {
+        var (ok, message) = FirewallManager.Remove();
+        SetMessage(message, !ok);
+        Raise(nameof(FirewallRulesExist));
+    }
 
     // ---- Identity and public addresses ---------------------------------------
 
@@ -78,6 +112,21 @@ public sealed class ServerSettingsViewModel : ViewModelBase
     }
 
     // ---- Listeners --------------------------------------------------------------
+
+    public bool SinglePortMode
+    {
+        get => _draft.SinglePortMode;
+        set
+        {
+            _draft.SinglePortMode = value;
+            Raise();
+            Raise(nameof(ShowsIndividualListeners));
+            Raise(nameof(FirewallPlan));
+        }
+    }
+
+    /// <summary>The per-protocol listener settings only mean something when ports are separate.</summary>
+    public bool ShowsIndividualListeners => !_draft.SinglePortMode;
 
     public bool EnableHttpRouter
     {

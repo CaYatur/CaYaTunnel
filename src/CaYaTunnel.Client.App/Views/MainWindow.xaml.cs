@@ -23,6 +23,21 @@ public partial class MainWindow : Window
         }
 
         shell.NewTunnelRequested += ShowNewTunnelDialog;
+        shell.EditTunnelRequested += ShowEditTunnelDialog;
+    }
+
+    private void ShowEditTunnelDialog(TunnelRow row)
+    {
+        if (Shell is not { } shell)
+        {
+            return;
+        }
+
+        new EditTunnelDialog
+        {
+            Owner = this,
+            DataContext = new EditTunnelViewModel(shell, row),
+        }.ShowDialog();
     }
 
     private void ShowNewTunnelDialog()
@@ -59,14 +74,24 @@ public partial class MainWindow : Window
 
     private void Close_Click(object sender, RoutedEventArgs e) => Close();
 
+    private bool _announcedTray;
+
     protected override void OnClosing(CancelEventArgs e)
     {
         // Closing the window is not the same as quitting: the agent's whole job is to stay
-        // connected, so the default is to keep running in the tray.
-        if (Shell?.Settings.CloseToTray == true)
+        // connected, so the default is to keep running in the tray. Exit from the tray menu sets
+        // IsExiting first, which is what lets that close actually go through.
+        if (Shell?.Settings.CloseToTray == true && !App.IsExiting)
         {
             e.Cancel = true;
             Hide();
+
+            if (!_announcedTray)
+            {
+                _announcedTray = true;
+                App.AnnounceStillRunning();
+            }
+
             return;
         }
 

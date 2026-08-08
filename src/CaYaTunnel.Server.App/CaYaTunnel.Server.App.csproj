@@ -7,6 +7,9 @@
     <RootNamespace>CaYaTunnel.Server.App</RootNamespace>
     <AssemblyName>CaYaTunnelServer</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WinForms is referenced only for the tray icon; the UI itself is entirely WPF. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
 
     <!--
       A custom entry point, because this executable has two jobs: the admin window, and a
@@ -19,6 +22,12 @@
   <ItemGroup>
     <ApplicationDefinition Remove="App.xaml" />
     <Page Include="App.xaml" SubType="Designer" Generator="MSBuild:Compile" />
+  </ItemGroup>
+
+  <!-- See the client app: WinForms' implicit usings collide with WPF on Brush and friends. -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 
   <ItemGroup>

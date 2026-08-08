@@ -117,6 +117,66 @@ Delete someone else's tunnel and the machine that owned it says so.
 
 ---
 
+## How many ports do I actually have to open?
+
+**On every client machine: none.** Not one, ever. The agent dials out; nothing dials in. This
+is the whole point and there is no configuration that changes it.
+
+**On the gateway**, it depends on what you serve:
+
+| What you run | Ports the gateway needs |
+|---|---|
+| Websites and/or Minecraft only | **One.** Turn on *Share one port for everything possible* |
+| Websites on the standard 80/443 | Three: control, 80, 443 |
+| Anything with its own public port (game servers, SSH, databases) | One per tunnel, plus the above |
+
+### Single-port mode
+
+Agent links, websites and Minecraft can all arrive on the control port, because each announces
+where it is going in its first bytes — the agent by its TLS server name, a website by SNI or the
+`Host` header, Minecraft by its handshake. The gateway reads that and hands the connection to the
+right place.
+
+Turn it on in **Settings → Listeners**. Forward that one port and you are done.
+
+The trade: visitors reach websites on that port (`https://panel.example.com:48771`) rather than
+on 443, unless something in front maps it for you — Cloudflare's proxy can, and so can any load
+balancer. If you want bare `https://panel.example.com`, use 443.
+
+### Why port tunnels still need their own port
+
+A plain TCP or UDP protocol carries no destination. A database client and a game client both open
+a socket and start talking, with nothing in the bytes to say which tunnel they meant. The port
+number has to *be* the destination — so each one needs its own, and no amount of cleverness
+removes that. Anything claiming otherwise is guessing.
+
+### Firewall rules
+
+**Settings → Windows Firewall** lists exactly which ports your current configuration needs and
+creates inbound rules for them. Rules are tagged as CaYaTunnel's, so removing them never touches
+anything else. Needs administrator rights.
+
+---
+
+## Is it actually working?
+
+Every tunnel has a **Test** button in the client. It tries the tunnel rather than reporting what
+the configuration says, and answers in the order you would debug it:
+
+1. **Is the local service up?** Dialled directly on the machine carrying the tunnel. If this
+   fails, the tunnel is fine and the service is not — and the test stops there rather than
+   blaming the tunnel for it.
+2. **Is the public address reachable?** Connected from outside the tunnel.
+3. **Did traffic actually land here?** For websites, a real request goes through and the answer
+   is checked. Reaching the gateway is not the same as reaching your tunnel: an unrouted hostname
+   still completes a TCP connection and then answers with the gateway's own 404.
+
+A UDP-only tunnel can only be checked as far as step 1 and 2's address resolution. UDP has no
+handshake, so silence is indistinguishable from a working service with nothing to say — the test
+says that rather than inventing a green tick.
+
+---
+
 ## DNS
 
 Hostname tunnels need DNS pointing at the gateway. Two ways:
@@ -168,8 +228,13 @@ The gateway can also install itself as a **Windows service**, which keeps tunnel
 nobody signed in. The service runs the same binary and the same code the admin app drives,
 so the two cannot drift.
 
-The client lives in the tray, starts hidden if you want, and reconnects on its own with
-exponential backoff. A brief network drop does not need a restart:
+Both applications live in the tray. Closing the window does not stop them — the agent keeps its
+tunnels up and the gateway keeps serving them — and **Exit** in the tray menu quits for real.
+Launching either a second time brings the running window forward rather than starting a second
+copy, which would only fight the first over the same ports or the same device identity.
+
+The client starts hidden if you want, and reconnects on its own with exponential backoff. A brief
+network drop does not need a restart:
 
 ```
 Disconnected → Reconnecting → Authenticated → Tunnels restored → Online

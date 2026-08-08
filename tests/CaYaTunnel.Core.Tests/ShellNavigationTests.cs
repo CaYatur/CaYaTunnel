@@ -100,6 +100,50 @@ public class ShellNavigationTests : IDisposable
 }
 
 /// <summary>
+/// Exiting is the one thing a user cannot work around, so it is guarded rather than trusted.
+/// Both apps shipped a version where closing the window left a process running with no window:
+/// teardown resumed on the UI thread while the UI thread waited for teardown.
+/// </summary>
+public class ShutdownGuardTests
+{
+    [Fact]
+    public void Teardown_runs_off_the_calling_thread()
+    {
+        // The whole fix: the UI thread stays free, so a continuation that wants it can have it.
+        var callingThread = Environment.CurrentManagedThreadId;
+        var workerThread = 0;
+
+        var finished = ShutdownGuard.Run(() =>
+        {
+            workerThread = Environment.CurrentManagedThreadId;
+            return Task.CompletedTask;
+        });
+
+        Assert.True(finished);
+        Assert.NotEqual(callingThread, workerThread);
+    }
+
+    [Fact]
+    public void A_teardown_that_never_finishes_is_abandoned_rather_than_trapping_the_process()
+    {
+        var stuck = new TaskCompletionSource();
+
+        var finished = ShutdownGuard.Run(() => stuck.Task, TimeSpan.FromMilliseconds(300));
+
+        Assert.False(finished);
+        stuck.TrySetResult();
+    }
+
+    [Fact]
+    public void A_teardown_that_throws_still_lets_the_process_exit()
+    {
+        var finished = ShutdownGuard.Run(() => throw new IOException("socket refused to close"));
+
+        Assert.True(finished);
+    }
+}
+
+/// <summary>
 /// The lock that stops two copies fighting over one set of state. Keyed on that state, so
 /// separate portable installs stay independent.
 /// </summary>

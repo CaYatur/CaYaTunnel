@@ -69,6 +69,9 @@ public sealed class ServerShellViewModel : ViewModelBase
         ClearLogCommand = new RelayCommand(() => LogEntries.Clear());
 
         DeleteTunnelCommand = new AsyncRelayCommand(DeleteTunnelAsync, p => p is ServerTunnelRow, ReportError);
+        EditTunnelCommand = new RelayCommand(
+            p => { if (p is ServerTunnelRow row) { EditTunnelRequested?.Invoke(row); } },
+            p => p is ServerTunnelRow);
         ToggleTunnelCommand = new AsyncRelayCommand(ToggleTunnelAsync, p => p is ServerTunnelRow, ReportError);
         ApproveDeviceCommand = new RelayCommand(ApproveDevice, p => p is ServerDeviceRow);
         RevokeDeviceCommand = new AsyncRelayCommand(RevokeDeviceAsync, p => p is ServerDeviceRow, ReportError);
@@ -114,6 +117,15 @@ public sealed class ServerShellViewModel : ViewModelBase
     public RelayCommand ClearLogCommand { get; }
 
     public AsyncRelayCommand DeleteTunnelCommand { get; }
+
+    public RelayCommand EditTunnelCommand { get; }
+
+    /// <summary>Raised when the operator asks to edit a tunnel; the view owns the window.</summary>
+    public event Action<ServerTunnelRow>? EditTunnelRequested;
+
+    /// <summary>Applies an edit through the same path a client's request takes.</summary>
+    public Task<Core.Models.TunnelDefinition> UpdateTunnelAsync(Core.Protocol.Messages.UpdateTunnelRequest request)
+        => _server.UpdateTunnelAsync(request, "server admin");
 
     public AsyncRelayCommand ToggleTunnelCommand { get; }
 
@@ -210,6 +222,9 @@ public sealed class ServerShellViewModel : ViewModelBase
 
     public string DataDirectory => ServerPaths.DataDirectory;
 
+    /// <summary>Raised after any refresh, so the tray icon can follow the gateway's state.</summary>
+    public event Action? StateChanged;
+
     // ---- Gateway ---------------------------------------------------------------
 
     private async Task StartAsync()
@@ -245,9 +260,14 @@ public sealed class ServerShellViewModel : ViewModelBase
         Refresh();
     }
 
+    /// <summary>
+    /// Stops the gateway. Every await here is <c>ConfigureAwait(false)</c>: shutdown is driven
+    /// from the UI thread, and resuming on a thread that is waiting for this method to finish is
+    /// a deadlock — the window closes and the process lives on, unreachable.
+    /// </summary>
     public async Task ShutdownAsync()
     {
-        await _server.DisposeAsync();
+        await _server.DisposeAsync().ConfigureAwait(false);
     }
 
     /// <summary>Applies edited settings and restarts the listeners if the gateway is up.</summary>
@@ -397,6 +417,8 @@ public sealed class ServerShellViewModel : ViewModelBase
 
         StartGatewayCommand.RaiseCanExecuteChanged();
         StopGatewayCommand.RaiseCanExecuteChanged();
+
+        StateChanged?.Invoke();
     }
 
     private void AppendLog(LogEntry entry)

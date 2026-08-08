@@ -273,6 +273,12 @@
                         <Button Style="{StaticResource GhostButton}" Content="{ui:L Copy}"
                                 Command="{Binding DataContext.CopyEndpointCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}" Content="{ui:L TestTunnel}"
+                                Command="{Binding DataContext.TestTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}" Content="{ui:L Edit}"
+                                Command="{Binding DataContext.EditTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
                         <Button Style="{StaticResource GhostButton}"
                                 Command="{Binding DataContext.ToggleTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                 CommandParameter="{Binding}">

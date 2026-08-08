@@ -1,0 +1,121 @@
+<Window x:Class="CaYaTunnel.Client.App.Views.EditTunnelDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:CaYaTunnel.Ui"
+        Width="600" SizeToContent="Height" MaxHeight="800"
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent" AllowsTransparency="True" WindowStyle="None"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+
+  <Window.Resources>
+    <ui:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    <ui:StringToVisibilityConverter x:Key="StringToVisibility" />
+  </Window.Resources>
+
+  <Border Background="{StaticResource BackgroundBrush}" BorderBrush="{StaticResource BorderBrush}"
+          BorderThickness="1" CornerRadius="12">
+    <Grid Margin="26,22,26,22">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Grid Grid.Row="0" Margin="0,0,0,18" MouseLeftButtonDown="Header_Drag" Background="Transparent">
+        <StackPanel>
+          <TextBlock Text="{ui:L EditTunnelTitle}" Style="{StaticResource TitleText}" />
+          <StackPanel Orientation="Horizontal" Margin="0,6,0,0">
+            <Border Style="{StaticResource Pill}" Background="{StaticResource SurfaceRaisedBrush}">
+              <TextBlock Text="{Binding KindLabel}" Style="{StaticResource MonoText}" FontSize="10" FontWeight="Bold" />
+            </Border>
+            <TextBlock Text="{Binding PublicEndpoint}" Style="{StaticResource MonoText}"
+                       Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" Margin="9,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+        <Button Style="{StaticResource CaptionButton}" Content="&#xE8BB;" HorizontalAlignment="Right"
+                VerticalAlignment="Top" Click="Close_Click" />
+      </Grid>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,8,0">
+          <TextBlock Text="{ui:L PublicAddressFixed}" Style="{StaticResource FieldHint}" Margin="0,0,0,16" />
+
+          <TextBlock Text="{ui:L FieldName}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}" Margin="0,0,0,14"
+                   Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}" />
+
+          <TextBlock Text="{ui:L FieldTargetHost}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}"
+                   Text="{Binding TargetHost, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Text="{ui:L FieldTargetHostHint}" Style="{StaticResource FieldHint}" />
+
+          <ItemsControl ItemsSource="{Binding LocalAddresses}" Margin="0,8,0,14">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Style="{StaticResource GhostButton}" Margin="0,0,6,6"
+                        Command="{Binding DataContext.UseLocalAddressCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}">
+                  <Border Background="{StaticResource SurfaceRaisedBrush}" CornerRadius="{StaticResource RadiusPill}"
+                          Padding="10,4">
+                    <TextBlock Text="{Binding}" Style="{StaticResource MonoText}" />
+                  </Border>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="{ui:L FieldTargetPort}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left" Margin="0,0,0,14"
+                   Text="{Binding TargetPort, UpdateSourceTrigger=PropertyChanged}" />
+
+          <StackPanel Visibility="{Binding IsPortKind, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{ui:L Transports}" Style="{StaticResource FieldLabel}" />
+            <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                      SelectedIndex="{Binding TransportIndex}" Width="220" HorizontalAlignment="Left">
+              <ComboBoxItem Content="{ui:L TransportTcp}" />
+              <ComboBoxItem Content="{ui:L TransportUdp}" />
+              <ComboBoxItem Content="{ui:L TransportBoth}" />
+            </ComboBox>
+            <TextBlock Text="{ui:L UdpNote}" Style="{StaticResource FieldHint}"
+                       Foreground="{StaticResource WarningBrush}" Margin="0,5,0,14"
+                       Visibility="{Binding ShowsUdpNote, Converter={StaticResource BoolToVisibility}}" />
+          </StackPanel>
+
+          <StackPanel Visibility="{Binding IsHttpKind, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{ui:L HttpAccess}" Style="{StaticResource FieldLabel}" />
+            <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                      SelectedIndex="{Binding HttpAccessIndex}" Width="280" HorizontalAlignment="Left">
+              <ComboBoxItem Content="{ui:L HttpAccessBoth}" />
+              <ComboBoxItem Content="{ui:L HttpAccessHttpsOnly}" />
+              <ComboBoxItem Content="{ui:L HttpAccessHttpOnly}" />
+              <ComboBoxItem Content="{ui:L HttpAccessRedirect}" />
+            </ComboBox>
+            <TextBlock Text="{ui:L HttpAccessHint}" Style="{StaticResource FieldHint}" Margin="0,5,0,14" />
+          </StackPanel>
+
+          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L TunnelEnabled}"
+                    IsChecked="{Binding Enabled}" Margin="0,0,0,6" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2" Margin="0,18,0,0">
+        <Border Background="{StaticResource DangerWashBrush}" BorderBrush="{StaticResource DangerBrush}"
+                BorderThickness="1" CornerRadius="{StaticResource RadiusMedium}" Padding="13,10" Margin="0,0,0,12"
+                Visibility="{Binding Error, Converter={StaticResource StringToVisibility}}">
+          <TextBlock Text="{Binding Error}" Style="{StaticResource BodyText}"
+                     Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+        </Border>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Style="{StaticResource GhostButton}" Content="{ui:L Cancel}" Click="Close_Click" Margin="0,0,10,0" />
+          <Button Style="{StaticResource PrimaryButton}" Content="{ui:L Save}" Command="{Binding SaveCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>
