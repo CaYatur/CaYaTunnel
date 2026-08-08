@@ -4,6 +4,7 @@ using System.Windows.Threading;
 using CaYaTunnel.Server.App.ViewModels;
 using CaYaTunnel.Server.App.Views;
 using CaYaTunnel.Server.Configuration;
+using CaYaTunnel.Ui;
 
 namespace CaYaTunnel.Server.App;
 

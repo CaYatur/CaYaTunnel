@@ -3,6 +3,7 @@ using System.ServiceProcess;
 using CaYaTunnel.Server.Configuration;
 using CaYaTunnel.Server.Gateway;
 using CaYaTunnel.Server.Registry;
+using CaYaTunnel.Ui;
 
 namespace CaYaTunnel.Server.App;
 

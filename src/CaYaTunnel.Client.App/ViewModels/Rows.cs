@@ -24,11 +24,15 @@ public sealed class TunnelRow(TunnelDefinition tunnel, string deviceName, bool d
 
     public string TargetEndpoint => Model.TargetEndpoint();
 
+    /// <summary>
+    /// The badge on each row. Port tunnels show their transports, because "TCP" on a row that is
+    /// actually carrying UDP is the kind of small lie that costs an hour of debugging.
+    /// </summary>
     public string KindLabel => Model.Kind switch
     {
-        TunnelKind.HttpHost => "HTTP",
+        TunnelKind.HttpHost => Model.HttpScheme.ToUpperInvariant(),
         TunnelKind.TcpHostAware => "MC",
-        _ => "TCP",
+        _ => Model.TransportLabel,
     };
 
     public string Traffic => $"↓ {ByteSizeConverter.Format(Model.BytesIn)}   ↑ {ByteSizeConverter.Format(Model.BytesOut)}";

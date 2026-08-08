@@ -89,10 +89,32 @@ public static class Strings
         ["KindMinecraftHint"] = new(
             "Shares one port with other Minecraft servers, split by hostname.",
             "Tek portu diğer Minecraft sunucularıyla paylaşır, alan adına göre ayrılır."),
-        ["KindTcp"] = new("Any TCP service", "Herhangi bir TCP servisi"),
+        ["KindTcp"] = new("Any other service", "Diğer servisler"),
         ["KindTcpHint"] = new(
-            "Gets a public port of its own. Use for anything else.",
-            "Kendine ait bir genel port alır. Diğer her şey için bunu kullan."),
+            "Gets a public port of its own, over TCP, UDP or both.",
+            "Kendine ait bir genel port alır; TCP, UDP veya ikisi birden."),
+
+        // ---- Transports ----
+        ["Transports"] = new("Protocol", "Protokol"),
+        ["TransportTcp"] = new("TCP", "TCP"),
+        ["TransportUdp"] = new("UDP", "UDP"),
+        ["TransportBoth"] = new("TCP + UDP", "TCP + UDP"),
+        ["TransportsHint"] = new(
+            "Both is the usual choice for game servers, which listen on the same port number for each.",
+            "Oyun sunucuları genelde aynı port numarasını ikisi için de dinler; bu durumda ikisini birden seç."),
+        ["UdpNote"] = new(
+            "UDP travels over the same reliable link, so a lossy connection costs latency rather than dropped packets.",
+            "UDP aynı güvenilir bağlantı üzerinden taşınır; paket kaybı olan bir hatta paket düşmek yerine gecikme artar."),
+
+        // ---- HTTP access ----
+        ["HttpAccess"] = new("Reachable over", "Erişim şeması"),
+        ["HttpAccessBoth"] = new("HTTP and HTTPS", "HTTP ve HTTPS"),
+        ["HttpAccessHttpsOnly"] = new("HTTPS only", "Yalnızca HTTPS"),
+        ["HttpAccessHttpOnly"] = new("HTTP only", "Yalnızca HTTP"),
+        ["HttpAccessRedirect"] = new("Redirect HTTP to HTTPS", "HTTP'yi HTTPS'e yönlendir"),
+        ["HttpAccessHint"] = new(
+            "The gateway always listens on both ports; this decides what this hostname does with each.",
+            "Ağ geçidi her iki portu da dinler; bu ayar bu alan adının her biriyle ne yapacağını belirler."),
         ["FieldName"] = new("Name", "Ad"),
         ["FieldNameHint"] = new("Shown in the list. Free text.", "Listede görünür. Serbest metin."),
         ["FieldSubdomain"] = new("Subdomain", "Alt alan adı"),

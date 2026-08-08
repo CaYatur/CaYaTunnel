@@ -401,7 +401,7 @@ public sealed class ServerShellViewModel : ViewModelBase
             Tunnels.Add(new ServerTunnelRow(tunnel, device?.Name ?? "?", device?.Online ?? false, server));
         }
 
-        foreach (var entry in PreviewData.SampleLog())
+        foreach (var entry in ServerPreview.SampleLog())
         {
             LogEntries.Add(entry);
         }

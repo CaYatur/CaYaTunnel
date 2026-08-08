@@ -23,6 +23,8 @@ public sealed class NewTunnelViewModel : ViewModelBase
     private bool _terminateTls = true;
     private string? _error;
     private DeviceChoice? _device;
+    private int _transportIndex;
+    private int _httpAccessIndex;
 
     public NewTunnelViewModel(ShellViewModel shell)
     {
@@ -126,6 +128,43 @@ public sealed class NewTunnelViewModel : ViewModelBase
     public bool IsPortKind => Kind == TunnelKind.PortForward;
 
     public bool IsHttpKind => Kind == TunnelKind.HttpHost;
+
+    /// <summary>0 = TCP, 1 = UDP, 2 = both. Bound to a combo box by index.</summary>
+    public int TransportIndex
+    {
+        get => _transportIndex;
+        set
+        {
+            if (Set(ref _transportIndex, value))
+            {
+                Raise(nameof(ShowsUdpNote));
+            }
+        }
+    }
+
+    public bool ShowsUdpNote => IsPortKind && TransportIndex is 1 or 2;
+
+    public TransportProtocols Transports => TransportIndex switch
+    {
+        1 => TransportProtocols.Udp,
+        2 => TransportProtocols.Both,
+        _ => TransportProtocols.Tcp,
+    };
+
+    /// <summary>0 = both schemes, 1 = HTTPS only, 2 = HTTP only, 3 = redirect to HTTPS.</summary>
+    public int HttpAccessIndex
+    {
+        get => _httpAccessIndex;
+        set => Set(ref _httpAccessIndex, value);
+    }
+
+    public HttpAccess HttpAccess => HttpAccessIndex switch
+    {
+        1 => HttpAccess.HttpsOnly,
+        2 => HttpAccess.HttpOnly,
+        3 => HttpAccess.RedirectToHttps,
+        _ => HttpAccess.HttpAndHttps,
+    };
 
     public string SuggestedPortHint => Kind switch
     {
@@ -240,6 +279,8 @@ public sealed class NewTunnelViewModel : ViewModelBase
             PublicPort = publicPort,
             Protocol = Kind == TunnelKind.TcpHostAware ? HostAwareProtocols.MinecraftJava : null,
             TerminateTls = TerminateTls,
+            HttpAccess = HttpAccess,
+            Transports = Transports,
         });
 
         if (result.Ok)

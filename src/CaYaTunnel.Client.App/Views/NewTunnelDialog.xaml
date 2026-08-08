@@ -98,9 +98,34 @@
             <TextBlock Text="{ui:L FieldSubdomainHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
           </StackPanel>
 
+          <!-- Scheme, for website tunnels -->
+          <StackPanel Visibility="{Binding IsHttpKind, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{ui:L HttpAccess}" Style="{StaticResource FieldLabel}" />
+            <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                      SelectedIndex="{Binding HttpAccessIndex}" Width="280" HorizontalAlignment="Left">
+              <ComboBoxItem Content="{ui:L HttpAccessBoth}" />
+              <ComboBoxItem Content="{ui:L HttpAccessHttpsOnly}" />
+              <ComboBoxItem Content="{ui:L HttpAccessHttpOnly}" />
+              <ComboBoxItem Content="{ui:L HttpAccessRedirect}" />
+            </ComboBox>
+            <TextBlock Text="{ui:L HttpAccessHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+          </StackPanel>
+
           <!-- Dedicated public port -->
           <StackPanel Visibility="{Binding IsPortKind, Converter={StaticResource BoolToVisibility}}">
-            <TextBlock Text="{ui:L FieldPublicPort}" Style="{StaticResource FieldLabel}" />
+            <TextBlock Text="{ui:L Transports}" Style="{StaticResource FieldLabel}" />
+            <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                      SelectedIndex="{Binding TransportIndex}" Width="220" HorizontalAlignment="Left">
+              <ComboBoxItem Content="{ui:L TransportTcp}" />
+              <ComboBoxItem Content="{ui:L TransportUdp}" />
+              <ComboBoxItem Content="{ui:L TransportBoth}" />
+            </ComboBox>
+            <TextBlock Text="{ui:L TransportsHint}" Style="{StaticResource FieldHint}" />
+            <TextBlock Text="{ui:L UdpNote}" Style="{StaticResource FieldHint}"
+                       Foreground="{StaticResource WarningBrush}"
+                       Visibility="{Binding ShowsUdpNote, Converter={StaticResource BoolToVisibility}}" />
+
+            <TextBlock Text="{ui:L FieldPublicPort}" Style="{StaticResource FieldLabel}" Margin="0,14,0,5" />
             <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left"
                      Text="{Binding PublicPort, UpdateSourceTrigger=PropertyChanged}" />
             <TextBlock Text="{ui:L FieldPublicPortHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />

@@ -92,6 +92,22 @@ public static class PreviewData
             },
             new TunnelDefinition
             {
+                Id = "t-game",
+                Name = "Valheim",
+                Kind = TunnelKind.PortForward,
+                Transports = TransportProtocols.Both,
+                DeviceId = CaganDeviceId,
+                PublicPort = 2456,
+                TargetHost = "127.0.0.1",
+                TargetPort = 2456,
+                BytesIn = 412_233_984,
+                BytesOut = 688_233_984,
+                TotalConnections = 233,
+                ActiveConnections = 2,
+                LastActiveAt = DateTimeOffset.UtcNow.AddSeconds(-1),
+            },
+            new TunnelDefinition
+            {
                 Id = "t-lan",
                 Name = "Home Assistant",
                 Kind = TunnelKind.PortForward,
@@ -109,6 +125,7 @@ public static class PreviewData
                 Id = "t-dev",
                 Name = "Vite dev server",
                 Kind = TunnelKind.HttpHost,
+                HttpAccess = HttpAccess.RedirectToHttps,
                 DeviceId = TufDeviceId,
                 Hostname = "dev.tunnel.example.com",
                 TargetHost = "127.0.0.1",

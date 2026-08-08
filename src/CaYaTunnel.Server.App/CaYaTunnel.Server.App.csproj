@@ -34,6 +34,7 @@
     <Compile Include="..\..\shared\Mvvm\*.cs" Link="Shared\%(Filename).cs" />
     <Compile Include="..\..\shared\Windows\*.cs" Link="Shared\%(Filename).cs" />
     <Compile Include="..\..\shared\Localization\*.cs" Link="Shared\%(Filename).cs" />
+    <Compile Include="..\..\shared\Preview\*.cs" Link="Shared\%(Filename).cs" />
     <Page Include="..\..\shared\Theme\*.xaml" Link="Theme\%(Filename).xaml" />
   </ItemGroup>
 
