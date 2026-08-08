@@ -140,6 +140,29 @@ public sealed class ServerSettingsViewModel : ViewModelBase
     /// <summary>The per-protocol listener settings only mean something when ports are separate.</summary>
     public bool ShowsIndividualListeners => !_draft.SinglePortMode;
 
+    public bool EnableStandardHttpsPort
+    {
+        get => _draft.EnableStandardHttpsPort;
+        set
+        {
+            _draft.EnableStandardHttpsPort = value;
+            Raise();
+            Raise(nameof(FirewallPlan));
+        }
+    }
+
+    public bool AutomaticTlsEnabled
+    {
+        get => _draft.AutomaticTlsEnabled;
+        set { _draft.AutomaticTlsEnabled = value; Raise(); }
+    }
+
+    public string AutomaticTlsEmail
+    {
+        get => _draft.AutomaticTlsEmail;
+        set { _draft.AutomaticTlsEmail = value; Raise(); }
+    }
+
     public bool EnableHttpRouter
     {
         get => _draft.EnableHttpRouter;

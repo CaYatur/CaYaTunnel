@@ -324,10 +324,20 @@ public static class Strings
             "Agent bağlantıları, web siteleri ve Minecraft hepsi kontrol portuna gelir; böylece yalnızca o tek portun açık olması yeterlidir. Bu durumda ziyaretçiler web sitelerine 443 yerine o porttan erişir (önünde eşleme yapan bir şey yoksa). Kendi genel portu olan tüneller bundan etkilenmez, onlar portlarını kullanmaya devam eder."),
         ["SinglePortActive"] = new("Only this port needs to be open:", "Yalnızca bu portun açık olması yeterli:"),
 
+        ["EnableStandardHttpsPort"] = new("Also serve ports-free HTTPS on 443", "Ayrıca 443 üzerinden portsuz HTTPS sun"),
+        ["EnableStandardHttpsPortHint"] = new(
+            "Off by default. Turn this on only when port 443 is free. The normal CaYaTunnel/shared port stays active; website links are then published without :port.",
+            "Varsayılan olarak kapalıdır. Yalnızca 443 portu boşsa aç. Normal CaYaTunnel/ortak port çalışmaya devam eder; web sitesi bağlantıları artık :port olmadan yayınlanır."),
+
         ["SectionPublicTls"] = new("PUBLIC HTTPS CERTIFICATE", "GENEL HTTPS SERTİFİKASI"),
         ["PublicTlsHint"] = new(
-            "Optional PKCS#12 (.pfx/.p12) certificate used for public HTTPS. If none is imported, CaYaTunnel uses its generated self-signed certificate.",
-            "Genel HTTPS için isteğe bağlı PKCS#12 (.pfx/.p12) sertifikası. İçeri aktarılmazsa CaYaTunnel oluşturduğu kendinden imzalı sertifikayı kullanır."),
+            "Use automatic Let's Encrypt HTTPS, or import your own certificate. Automatic mode uses Cloudflare DNS-01 and renews before expiry without needing ports 80/443 for validation.",
+            "Otomatik Let's Encrypt HTTPS kullanabilir veya kendi sertifikanı içeri aktarabilirsin. Otomatik mod Cloudflare DNS-01 kullanır ve doğrulama için 80/443 portlarına ihtiyaç duymadan süresi dolmadan yeniler."),
+        ["AutomaticTlsEnabled"] = new("Automatic Let's Encrypt certificate", "Otomatik Let's Encrypt sertifikası"),
+        ["AutomaticTlsEnabledHint"] = new(
+            "Requires Cloudflare DNS automation and a DNS API token with Zone DNS Edit permission. The wildcard certificate is requested for the configured base domain and renewed automatically.",
+            "Cloudflare DNS otomasyonu ve Zone DNS Edit yetkili bir DNS API tokenı gerekir. Yapılandırılmış temel alan adı için wildcard sertifika alınır ve otomatik yenilenir."),
+        ["AutomaticTlsEmail"] = new("Let's Encrypt contact e-mail", "Let's Encrypt iletişim e-postası"),
         ["PublicTlsPassword"] = new("Certificate password", "Sertifika parolası"),
         ["PublicTlsPasswordHint"] = new(
             "Enter the PFX/P12 password before importing. Leave empty for a passwordless certificate.",

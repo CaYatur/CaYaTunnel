@@ -127,10 +127,18 @@ public sealed partial class TunnelServer
         _publicShutdown = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var token = _publicShutdown.Token;
 
-        // In single-port mode the control listener already serves HTTP, HTTPS and Minecraft, so
-        // binding them again would only fight itself for the ports.
+        // In single-port mode the control listener already serves HTTP, HTTPS and Minecraft.
+        // The optional standard HTTPS endpoint is deliberately separate and off by default so
+        // installations already using port 443 are never disturbed.
         if (Config.SinglePortMode)
         {
+            if (Config.EnableStandardHttpsPort && Config.ControlPort != 443 && Config.EnableHttpRouter)
+            {
+                _listenerTasks.Add(RunListenerAsync(443, "https-standard",
+                    (stream, remote, ct) => RouteHttpAsync(stream, remote, secure: true, ct), token));
+                Log.Info("gateway", "Ports-free HTTPS enabled on port 443; the shared tunnel port remains unchanged.");
+            }
+
             foreach (var tunnel in Registry.Tunnels.Where(t => t.Kind == TunnelKind.PortForward && t.PublicPort.HasValue))
             {
                 StartPortListener(tunnel);
@@ -154,6 +162,12 @@ public sealed partial class TunnelServer
 
             _listenerTasks.Add(RunListenerAsync(Config.HttpsPort, "https",
                 (stream, remote, ct) => RouteHttpAsync(stream, remote, secure: true, ct), token));
+
+            if (Config.EnableStandardHttpsPort && Config.HttpsPort != 443)
+            {
+                _listenerTasks.Add(RunListenerAsync(443, "https-standard",
+                    (stream, remote, ct) => RouteHttpAsync(stream, remote, secure: true, ct), token));
+            }
         }
 
         if (Config.EnableMinecraftRouter)

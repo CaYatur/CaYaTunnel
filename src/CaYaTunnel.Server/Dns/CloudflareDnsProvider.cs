@@ -71,6 +71,40 @@ public sealed class CloudflareDnsProvider(
         return response?.Id ?? existing;
     }
 
+    /// <summary>
+    /// Creates or replaces a DNS-01 TXT record. TXT records are never proxied.
+    /// </summary>
+    public async Task<string?> CreateTxtRecordAsync(
+        string hostname,
+        string value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hostname);
+        ArgumentException.ThrowIfNullOrWhiteSpace(value);
+
+        var existing = await FindRecordAsync(hostname, cancellationToken).ConfigureAwait(false);
+        var body = new CloudflareRecordRequest
+        {
+            Type = "TXT",
+            Name = hostname,
+            Content = value,
+            Ttl = 60,
+            Proxied = false,
+        };
+
+        using var request = new HttpRequestMessage(
+            existing is null ? HttpMethod.Post : HttpMethod.Put,
+            existing is null
+                ? $"{ApiRoot}/zones/{_zoneId}/dns_records"
+                : $"{ApiRoot}/zones/{_zoneId}/dns_records/{existing}")
+        {
+            Content = JsonContent.Create(body),
+        };
+
+        var response = await SendAsync<CloudflareRecordResult>(request, cancellationToken).ConfigureAwait(false);
+        return response?.Id ?? existing;
+    }
+
     public async Task RemoveRecordAsync(string hostname, string? recordId, CancellationToken cancellationToken = default)
     {
         var id = recordId;

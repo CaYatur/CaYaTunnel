@@ -99,15 +99,32 @@ public sealed partial class TunnelServer : IAsyncDisposable
 
         ControlCertificateFingerprint = CertificateManager.Fingerprint(_controlCertificate);
 
+        if (Config.AutomaticTlsEnabled)
+        {
+            await AutomaticTlsCertificateManager.EnsureCertificateAsync(Config, cancellationToken: token)
+                .ConfigureAwait(false);
+        }
+
+        var publicCertificatePath = Config.AutomaticTlsEnabled
+            ? ServerPaths.AutomaticPublicCertificateFile
+            : string.IsNullOrWhiteSpace(Config.PublicTlsCertificatePath)
+                ? ServerPaths.PublicCertificateFile
+                : Config.PublicTlsCertificatePath;
+        var publicCertificatePassword = Config.AutomaticTlsEnabled ? "" : Config.PublicTlsCertificatePassword;
+
         _publicCertificate = CertificateManager.LoadOrCreate(
-            string.IsNullOrWhiteSpace(Config.PublicTlsCertificatePath) ? ServerPaths.PublicCertificateFile : Config.PublicTlsCertificatePath,
-            Config.PublicTlsCertificatePassword,
+            publicCertificatePath,
+            publicCertificatePassword,
             string.IsNullOrWhiteSpace(Config.BaseDomain) ? "cayatunnel-public" : $"*.{Config.BaseDomain}");
 
         _dns = CreateDnsProvider(Config);
 
         _listenerTasks.Clear();
         _listenerTasks.Add(RunControlListenerAsync(token));
+        if (Config.AutomaticTlsEnabled)
+        {
+            _listenerTasks.Add(RunAutomaticTlsRenewalAsync(token));
+        }
 
         StartPublicListeners(token);
 
@@ -117,6 +134,46 @@ public sealed partial class TunnelServer : IAsyncDisposable
         StateChanged?.Invoke();
 
         await Task.CompletedTask.ConfigureAwait(false);
+    }
+
+    private async Task RunAutomaticTlsRenewalAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromHours(12), cancellationToken).ConfigureAwait(false);
+                if (!AutomaticTlsCertificateManager.NeedsRenewal(ServerPaths.AutomaticPublicCertificateFile))
+                {
+                    continue;
+                }
+
+                Log.Info("gateway", "Automatic HTTPS certificate is nearing expiry; starting renewal.");
+                var renewed = await AutomaticTlsCertificateManager
+                    .EnsureCertificateAsync(Config, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (renewed)
+                {
+                    var replacement = CertificateManager.LoadOrCreate(
+                        ServerPaths.AutomaticPublicCertificateFile,
+                        "",
+                        string.IsNullOrWhiteSpace(Config.BaseDomain) ? "cayatunnel-public" : $"*.{Config.BaseDomain}");
+                    _publicCertificate = replacement;
+                    Log.Info("gateway", $"Automatic HTTPS certificate renewed; valid until {replacement.NotAfter:u}.");
+                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                // Keep serving the existing certificate and retry later. Renewal starts 30 days
+                // before expiry, so a transient DNS/ACME outage does not take the gateway down.
+                Log.Error("gateway", $"Automatic HTTPS renewal failed: {ex.Message}");
+            }
+        }
     }
 
     public async Task StopAsync()
@@ -189,7 +246,7 @@ public sealed partial class TunnelServer : IAsyncDisposable
         DnsProviderKind.Cloudflare => new CloudflareDnsProvider(
             config.Dns.CloudflareApiToken,
             config.Dns.CloudflareZoneId,
-            config.Dns.ProxyRecords,
+            config.Dns.ProxyRecords && !config.AutomaticTlsEnabled,
             config.Dns.RecordTtl),
         _ => new ManualDnsProvider(),
     };

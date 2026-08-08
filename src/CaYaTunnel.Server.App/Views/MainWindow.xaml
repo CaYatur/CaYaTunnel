@@ -509,6 +509,9 @@
                           <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L SinglePortMode}"
                                     IsChecked="{Binding SinglePortMode}" />
                           <TextBlock Text="{ui:L SinglePortModeHint}" Style="{StaticResource FieldHint}" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L EnableStandardHttpsPort}"
+                                    IsChecked="{Binding EnableStandardHttpsPort}" Margin="0,14,0,0" />
+                          <TextBlock Text="{ui:L EnableStandardHttpsPortHint}" Style="{StaticResource FieldHint}" />
 
                           <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,16" />
 
@@ -552,6 +555,14 @@
                       <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                         <StackPanel>
                           <TextBlock Text="{ui:L PublicTlsHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,12" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L AutomaticTlsEnabled}"
+                                    IsChecked="{Binding AutomaticTlsEnabled}" />
+                          <TextBlock Text="{ui:L AutomaticTlsEnabledHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,12" />
+                          <TextBlock Text="{ui:L AutomaticTlsEmail}" Style="{StaticResource FieldLabel}" />
+                          <TextBox Style="{StaticResource FieldInput}" Width="320" HorizontalAlignment="Left"
+                                   Margin="0,0,0,14"
+                                   Text="{Binding AutomaticTlsEmail, UpdateSourceTrigger=PropertyChanged}" />
+                          <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,0,0,14" />
                           <TextBlock Text="{Binding PublicTlsCertificateSummary}" Style="{StaticResource MutedText}"
                                      TextWrapping="Wrap" Margin="0,0,0,12" />
                           <TextBlock Text="{ui:L PublicTlsPassword}" Style="{StaticResource FieldLabel}" />

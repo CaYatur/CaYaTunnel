@@ -27,6 +27,12 @@ public static class ServerPaths
     /// </summary>
     public static string ImportedPublicCertificateFile => Path.Combine(DataDirectory, "public-tls-imported.pfx");
 
+    /// <summary>Browser-trusted certificate obtained and renewed through ACME.</summary>
+    public static string AutomaticPublicCertificateFile => Path.Combine(DataDirectory, "public-tls-acme.pfx");
+
+    /// <summary>Persistent ACME account key; kept local so renewals reuse the same account.</summary>
+    public static string AcmeAccountKeyFile => Path.Combine(DataDirectory, "acme-account-key.pem");
+
     /// <summary>Prebuilt client executable that provisioning copies and appends config to.</summary>
     public static string ClientStubFile => Path.Combine(DataDirectory, "stub", "CaYaTunnel.Client.exe");
 

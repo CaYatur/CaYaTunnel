@@ -116,6 +116,22 @@ public sealed class ServerConfig
 
     public string PublicTlsCertificatePassword { get; set; } = "";
 
+    /// <summary>
+    /// Automatically obtain and renew a browser-trusted wildcard certificate with Let's Encrypt
+    /// using Cloudflare DNS-01. This never requires ports 80 or 443 for validation.
+    /// </summary>
+    public bool AutomaticTlsEnabled { get; set; }
+
+    /// <summary>Contact e-mail registered with the ACME account.</summary>
+    public string AutomaticTlsEmail { get; set; } = "";
+
+    /// <summary>
+    /// Optional ports-free HTTPS endpoint. Off by default because port 443 may already belong to
+    /// another service. When enabled, the public HTTPS router also binds 443 and reported HTTPS
+    /// URLs omit the explicit port.
+    /// </summary>
+    public bool EnableStandardHttpsPort { get; set; }
+
     // ---- DNS ----------------------------------------------------------------
 
     public DnsSettings Dns { get; set; } = new();
@@ -141,7 +157,7 @@ public sealed class ServerConfig
         // reported to clients have to say. Reporting 443 here would have every tunnel display an
         // address that goes to whatever else is on 443.
         HttpPort = SinglePortMode ? ControlPort : HttpPort,
-        HttpsPort = SinglePortMode ? ControlPort : HttpsPort,
+        HttpsPort = EnableStandardHttpsPort ? 443 : (SinglePortMode ? ControlPort : HttpsPort),
         MinecraftPort = SinglePortMode ? ControlPort : MinecraftPort,
         TcpPortRangeStart = TcpPortRangeStart,
         TcpPortRangeEnd = TcpPortRangeEnd,
@@ -157,10 +173,15 @@ public sealed class ServerConfig
     {
         yield return ("control port", ControlPort);
 
-        // In single-port mode nothing else is bound, so nothing else is reserved and the whole
-        // range stays available to tunnels.
+        // In single-port mode the shared listener owns the control port. The optional ports-free
+        // HTTPS endpoint additionally owns 443, but remains off by default.
         if (SinglePortMode)
         {
+            if (EnableStandardHttpsPort && ControlPort != 443)
+            {
+                yield return ("standard HTTPS port", 443);
+            }
+
             yield break;
         }
 
@@ -168,6 +189,10 @@ public sealed class ServerConfig
         {
             yield return ("HTTP port", HttpPort);
             yield return ("HTTPS port", HttpsPort);
+            if (EnableStandardHttpsPort && HttpsPort != 443)
+            {
+                yield return ("standard HTTPS port", 443);
+            }
         }
 
         if (EnableMinecraftRouter)
@@ -231,6 +256,24 @@ public sealed class ServerConfig
             {
                 problems.Add("Cloudflare is selected but no base domain is set, so there is nothing to create records under.");
             }
+        }
+
+        if (AutomaticTlsEnabled)
+        {
+            if (Dns.Provider != DnsProviderKind.Cloudflare)
+            {
+                problems.Add("Automatic HTTPS currently requires Cloudflare DNS automation for DNS-01 validation.");
+            }
+
+            if (string.IsNullOrWhiteSpace(AutomaticTlsEmail) || !AutomaticTlsEmail.Contains('@'))
+            {
+                problems.Add("Automatic HTTPS needs a valid contact e-mail for the Let's Encrypt account.");
+            }
+        }
+
+        if (EnableStandardHttpsPort && !EnableHttpRouter)
+        {
+            problems.Add("Ports-free HTTPS requires the HTTP/HTTPS hostname router to be enabled.");
         }
 
         return problems;
