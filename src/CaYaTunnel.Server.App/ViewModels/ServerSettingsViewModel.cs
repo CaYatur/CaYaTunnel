@@ -539,7 +539,26 @@ public sealed class ServerSettingsViewModel : ViewModelBase
             _draft.Dns.ProxyRecords,
             _draft.Dns.RecordTtl);
 
-        var status = await provider.TestAsync();
+        if (string.IsNullOrWhiteSpace(_draft.Dns.CloudflareZoneId))
+        {
+            var discovered = await provider.DiscoverZoneAsync(_draft.BaseDomain);
+            if (!discovered.Ok || string.IsNullOrWhiteSpace(discovered.ZoneId))
+            {
+                SetDnsStatus(discovered.Message, false);
+                return;
+            }
+
+            _draft.Dns.CloudflareZoneId = discovered.ZoneId;
+            Raise(nameof(CloudflareZoneId));
+        }
+
+        using var testProvider = new Server.Dns.CloudflareDnsProvider(
+            _draft.Dns.CloudflareApiToken,
+            _draft.Dns.CloudflareZoneId,
+            _draft.Dns.ProxyRecords,
+            _draft.Dns.RecordTtl);
+
+        var status = await testProvider.TestAsync();
         SetDnsStatus(status.Message, status.Ok);
     }
 

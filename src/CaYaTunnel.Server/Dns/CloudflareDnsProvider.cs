@@ -131,6 +131,11 @@ public sealed class CloudflareDnsProvider(
 
     public async Task<DnsProviderStatus> TestAsync(CancellationToken cancellationToken = default)
     {
+        if (string.IsNullOrWhiteSpace(_zoneId))
+        {
+            return new DnsProviderStatus(false, "Cloudflare zone id is empty.");
+        }
+
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{ApiRoot}/zones/{_zoneId}");
@@ -138,11 +143,67 @@ public sealed class CloudflareDnsProvider(
 
             return zone is null
                 ? new DnsProviderStatus(false, "Cloudflare accepted the request but returned no zone.")
-                : new DnsProviderStatus(true, $"Connected to zone '{zone.Name}'.", zone.Name);
+                : new DnsProviderStatus(true, $"Connected to zone '{zone.Name}'.", zone.Name, zone.Id);
         }
         catch (DnsProviderException ex)
         {
             return new DnsProviderStatus(false, ex.Message);
+        }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        {
+            return new DnsProviderStatus(false, $"Could not reach the Cloudflare API: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Finds the Cloudflare zone that contains a hostname by trying progressively shorter DNS
+    /// suffixes. This lets the UI fill Zone ID automatically for base domains such as
+    /// tunnel.example.com whose actual Cloudflare zone is example.com.
+    /// </summary>
+    public async Task<DnsProviderStatus> DiscoverZoneAsync(
+        string hostname,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(hostname);
+
+        var labels = hostname.Trim().Trim('.').Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (labels.Length < 2)
+        {
+            return new DnsProviderStatus(false, "Enter a valid base domain before discovering the Cloudflare zone.");
+        }
+
+        try
+        {
+            for (var start = 0; start <= labels.Length - 2; start++)
+            {
+                var candidate = string.Join('.', labels.Skip(start));
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"{ApiRoot}/zones?name={Uri.EscapeDataString(candidate)}&status=active&per_page=50");
+
+                var zones = await SendAsync<List<CloudflareZoneResult>>(request, cancellationToken)
+                    .ConfigureAwait(false);
+                var zone = zones?.FirstOrDefault(z =>
+                    string.Equals(z.Name, candidate, StringComparison.OrdinalIgnoreCase));
+                if (zone is not null)
+                {
+                    return new DnsProviderStatus(
+                        true,
+                        $"Found Cloudflare zone '{zone.Name}'.",
+                        zone.Name,
+                        zone.Id);
+                }
+            }
+
+            return new DnsProviderStatus(
+                false,
+                "No accessible Cloudflare zone was found for this base domain. Enter the Zone ID manually or give the token Zone Read permission.");
+        }
+        catch (DnsProviderException ex)
+        {
+            return new DnsProviderStatus(
+                false,
+                $"Could not discover the Cloudflare zone: {ex.Message} Enter the Zone ID manually if this token only has DNS Edit permission.");
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {

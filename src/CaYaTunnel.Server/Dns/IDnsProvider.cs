@@ -38,7 +38,7 @@ public interface IDnsProvider
     Task<DnsProviderStatus> TestAsync(CancellationToken cancellationToken = default);
 }
 
-public sealed record DnsProviderStatus(bool Ok, string Message, string? ZoneName = null);
+public sealed record DnsProviderStatus(bool Ok, string Message, string? ZoneName = null, string? ZoneId = null);
 
 /// <summary>
 /// Used when the operator manages DNS themselves. Creating a record is a no-op that succeeds, so
