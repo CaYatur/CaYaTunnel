@@ -1,6 +1,6 @@
 using System.Security.Cryptography;
 
-namespace CaYaTunnel.Server.Registry;
+namespace CaYaTunnel.Core.Models;
 
 /// <summary>
 /// Generates readable subdomain labels for tunnels created without a name. Short, easy to read

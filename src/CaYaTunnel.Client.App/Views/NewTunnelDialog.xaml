@@ -1,0 +1,180 @@
+<Window x:Class="CaYaTunnel.Client.App.Views.NewTunnelDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:CaYaTunnel.Ui"
+        Width="620" SizeToContent="Height" MaxHeight="820"
+        WindowStartupLocation="CenterOwner"
+        Background="Transparent" AllowsTransparency="True" WindowStyle="None"
+        ShowInTaskbar="False" UseLayoutRounding="True">
+
+  <Window.Resources>
+    <ui:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    <ui:StringToVisibilityConverter x:Key="StringToVisibility" />
+  </Window.Resources>
+
+  <Border Background="{StaticResource BackgroundBrush}" BorderBrush="{StaticResource BorderBrush}"
+          BorderThickness="1" CornerRadius="12">
+    <Grid Margin="26,22,26,22">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <Grid Grid.Row="0" Margin="0,0,0,18" MouseLeftButtonDown="Header_Drag" Background="Transparent">
+        <TextBlock Text="{ui:L NewTunnelTitle}" Style="{StaticResource TitleText}" />
+        <Button Style="{StaticResource CaptionButton}" Content="&#xE8BB;" HorizontalAlignment="Right"
+                VerticalAlignment="Top" Click="Close_Click" />
+      </Grid>
+
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="0,0,8,0">
+
+          <!-- Kind: framed by consequence, not by implementation -->
+          <UniformGrid Columns="3" Margin="0,0,0,18">
+            <RadioButton Style="{StaticResource CardRadio}" GroupName="Kind" IsChecked="{Binding IsHttp}">
+              <StackPanel>
+                <TextBlock Text="{ui:L KindHttp}" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                <TextBlock Text="{ui:L KindHttpHint}" Style="{StaticResource MutedText}" Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource CardRadio}" GroupName="Kind" IsChecked="{Binding IsMinecraft}">
+              <StackPanel>
+                <TextBlock Text="{ui:L KindMinecraft}" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                <TextBlock Text="{ui:L KindMinecraftHint}" Style="{StaticResource MutedText}" Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource CardRadio}" GroupName="Kind" IsChecked="{Binding IsTcp}" Margin="0">
+              <StackPanel>
+                <TextBlock Text="{ui:L KindTcp}" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                <TextBlock Text="{ui:L KindTcpHint}" Style="{StaticResource MutedText}" Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </RadioButton>
+          </UniformGrid>
+
+          <!-- Hostname tunnels need a base domain; say so instead of failing on create. -->
+          <Border Background="{StaticResource WarningWashBrush}" BorderBrush="{StaticResource WarningBrush}"
+                  BorderThickness="1" CornerRadius="{StaticResource RadiusMedium}" Padding="13,10" Margin="0,0,0,16">
+            <Border.Style>
+              <Style TargetType="Border">
+                <Setter Property="Visibility" Value="Collapsed" />
+                <Style.Triggers>
+                  <MultiDataTrigger>
+                    <MultiDataTrigger.Conditions>
+                      <Condition Binding="{Binding IsHostnameKind}" Value="True" />
+                      <Condition Binding="{Binding HostnamesAvailable}" Value="False" />
+                    </MultiDataTrigger.Conditions>
+                    <Setter Property="Visibility" Value="Visible" />
+                  </MultiDataTrigger>
+                </Style.Triggers>
+              </Style>
+            </Border.Style>
+            <TextBlock Text="{ui:L HostnamesUnavailable}" Style="{StaticResource SecondaryText}" TextWrapping="Wrap" />
+          </Border>
+
+          <TextBlock Text="{ui:L FieldName}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}" Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                   Margin="0,0,0,14" />
+
+          <!-- Hostname -->
+          <StackPanel Visibility="{Binding IsHostnameKind, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{ui:L FieldSubdomain}" Style="{StaticResource FieldLabel}" />
+            <Grid Margin="0,0,0,4">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBox Grid.Column="0" Style="{StaticResource FieldInput}"
+                       Text="{Binding Subdomain, UpdateSourceTrigger=PropertyChanged}" />
+              <TextBlock Grid.Column="1" Text="{Binding BaseDomainSuffix}" Style="{StaticResource MonoText}"
+                         Foreground="{StaticResource TextMutedBrush}" VerticalAlignment="Center" Margin="9,0,9,0" />
+              <Button Grid.Column="2" Style="{StaticResource SecondaryButton}" Content="{ui:L RandomName}"
+                      Command="{Binding RandomiseCommand}" Padding="12,8" />
+            </Grid>
+            <TextBlock Text="{ui:L FieldSubdomainHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+          </StackPanel>
+
+          <!-- Dedicated public port -->
+          <StackPanel Visibility="{Binding IsPortKind, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="{ui:L FieldPublicPort}" Style="{StaticResource FieldLabel}" />
+            <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left"
+                     Text="{Binding PublicPort, UpdateSourceTrigger=PropertyChanged}" />
+            <TextBlock Text="{ui:L FieldPublicPortHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+          </StackPanel>
+
+          <!-- Device -->
+          <TextBlock Text="{ui:L FieldDevice}" Style="{StaticResource FieldLabel}" />
+          <!-- An explicit ItemTemplate rather than DisplayMemberPath: the custom ComboBox
+               template renders SelectionBoxItem directly, and DisplayMemberPath's generated
+               template does not reach it, so the closed box would show the raw object. -->
+          <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                    ItemsSource="{Binding Devices}" SelectedItem="{Binding Device}">
+            <ComboBox.ItemTemplate>
+              <DataTemplate>
+                <TextBlock Text="{Binding Display}" Style="{StaticResource BodyText}" />
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <TextBlock Text="{ui:L FieldDeviceHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+
+          <!-- Target -->
+          <TextBlock Text="{ui:L FieldTargetHost}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}" Text="{Binding TargetHost, UpdateSourceTrigger=PropertyChanged}" />
+          <TextBlock Text="{ui:L FieldTargetHostHint}" Style="{StaticResource FieldHint}" />
+
+          <!-- One-tap shortcuts for this machine's own addresses; typing an IP from memory is
+               the most error-prone part of setting up a LAN tunnel. -->
+          <ItemsControl ItemsSource="{Binding LocalAddresses}" Margin="0,8,0,14">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <Button Style="{StaticResource GhostButton}" Margin="0,0,6,6"
+                        Command="{Binding DataContext.UseLocalAddressCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                        CommandParameter="{Binding}">
+                  <Border Background="{StaticResource SurfaceRaisedBrush}" CornerRadius="{StaticResource RadiusPill}"
+                          Padding="10,4">
+                    <TextBlock Text="{Binding}" Style="{StaticResource MonoText}" />
+                  </Border>
+                </Button>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="{ui:L FieldTargetPort}" Style="{StaticResource FieldLabel}" />
+          <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left"
+                   Text="{Binding TargetPort, UpdateSourceTrigger=PropertyChanged}"
+                   Tag="{Binding SuggestedPortHint}" Margin="0,0,0,14" />
+
+          <!-- TLS termination, HTTP only -->
+          <StackPanel Visibility="{Binding IsHttpKind, Converter={StaticResource BoolToVisibility}}" Margin="0,0,0,6">
+            <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L TerminateTls}"
+                      IsChecked="{Binding TerminateTls}" />
+            <TextBlock Text="{ui:L TerminateTlsHint}" Style="{StaticResource FieldHint}" />
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2" Margin="0,18,0,0">
+        <Border Background="{StaticResource DangerWashBrush}" BorderBrush="{StaticResource DangerBrush}"
+                BorderThickness="1" CornerRadius="{StaticResource RadiusMedium}" Padding="13,10" Margin="0,0,0,12"
+                Visibility="{Binding Error, Converter={StaticResource StringToVisibility}}">
+          <TextBlock Text="{Binding Error}" Style="{StaticResource BodyText}"
+                     Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" />
+        </Border>
+
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+          <Button Style="{StaticResource GhostButton}" Content="{ui:L Cancel}" Click="Close_Click" Margin="0,0,10,0" />
+          <Button Style="{StaticResource PrimaryButton}" Content="{ui:L Create}" Command="{Binding CreateCommand}" />
+        </StackPanel>
+      </StackPanel>
+    </Grid>
+  </Border>
+</Window>

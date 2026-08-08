@@ -5,7 +5,13 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
-    <InvariantGlobalization>true</InvariantGlobalization>
+    <!--
+      Globalization stays on. WPF resolves a specific culture for every binding, and with
+      InvariantGlobalization it throws "Cannot find non-neutral culture related to 'en-us'" the
+      moment a window is shown. The UI also ships in two languages, so culture data is needed
+      rather than merely tolerated.
+    -->
+    <InvariantGlobalization>false</InvariantGlobalization>
     <Version>1.0.0</Version>
     <Authors>CaYaDev</Authors>
     <Product>CaYaTunnel</Product>

@@ -1,0 +1,71 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>CaYaTunnel.Client.App</RootNamespace>
+    <!-- What the user actually double-clicks. Distinct from the CaYaTunnel.Client engine library. -->
+    <AssemblyName>CaYaTunnelClient</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WinForms is referenced only for NotifyIcon; the UI itself is entirely WPF. -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <!--
+      WFO0003 tells WinForms apps to move DPI settings out of the manifest. This is a WPF app,
+      where the manifest is the correct place for per-monitor v2 awareness, so the advice does
+      not apply.
+    -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <!--
+    Single-file publish settings. These are load-bearing for provisioning: the server hands out
+    a client by copying this exe and appending a config blob to its tail, so anything that
+    changes the tail layout breaks provisioning.
+
+    - Compression is off deliberately. It is not about size: it rewrites the bundle layout, and
+      the provisioning round-trip is verified against an uncompressed publish.
+    - Native libraries are self-extracted because WPF needs them and the alternative is loose
+      DLLs beside the exe, which is not "one portable file".
+    - Trimming is off: control messages are serialised with reflection-based System.Text.Json.
+  -->
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+  <!--
+    Enabling WinForms (for NotifyIcon) adds System.Drawing and System.Windows.Forms to the
+    implicit usings, which then collide with WPF on Brush, Color, Application and friends in
+    every file. Only TrayIcon.cs needs them, so it imports them itself.
+  -->
+  <ItemGroup>
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaYaTunnel.Core\CaYaTunnel.Core.csproj" />
+    <ProjectReference Include="..\CaYaTunnel.Client\CaYaTunnel.Client.csproj" />
+  </ItemGroup>
+
+  <!--
+    Theme, MVVM plumbing and Windows integration are shared with the server app by linking rather
+    than by a shared assembly: WPF resource dictionaries resolve through pack URIs that are far
+    simpler when the XAML compiles into the application itself.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\shared\Mvvm\*.cs" Link="Shared\%(Filename).cs" />
+    <Compile Include="..\..\shared\Windows\*.cs" Link="Shared\%(Filename).cs" />
+    <Compile Include="..\..\shared\Localization\*.cs" Link="Shared\%(Filename).cs" />
+    <Page Include="..\..\shared\Theme\*.xaml" Link="Theme\%(Filename).xaml" />
+  </ItemGroup>
+
+</Project>

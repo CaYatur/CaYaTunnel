@@ -43,6 +43,10 @@ public sealed class ClientSettings
 
     public bool ShowNotifications { get; set; } = true;
 
+    /// <summary>0 = follow Windows, 1 = Turkish, 2 = English. Stored as an int so the engine
+    /// library does not need to reference the UI's language enum.</summary>
+    public int Language { get; set; }
+
     /// <summary>Last window size, so the app reopens the way the user left it.</summary>
     public double WindowWidth { get; set; }
 

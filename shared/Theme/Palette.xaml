@@ -1,0 +1,86 @@
+<!--
+  CaYaDev palette. One source of truth for both applications so the gateway and the agent look
+  like halves of the same product rather than two tools that happen to ship together.
+
+  Near-black surfaces with a single saturated red accent, mirroring cayadev.com. The accent is
+  reserved for the primary action and for live/attention states; using it anywhere else makes
+  the thing that matters stop standing out.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+  <!-- ==== Surfaces ==== -->
+  <Color x:Key="BackgroundColor">#FF08080A</Color>
+  <Color x:Key="SurfaceColor">#FF121216</Color>
+  <Color x:Key="SurfaceRaisedColor">#FF17171D</Color>
+  <Color x:Key="SurfaceHoverColor">#FF1E1E25</Color>
+  <Color x:Key="BorderColor">#FF272730</Color>
+  <Color x:Key="BorderSubtleColor">#FF1C1C22</Color>
+
+  <SolidColorBrush x:Key="BackgroundBrush" Color="{StaticResource BackgroundColor}" />
+  <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+  <SolidColorBrush x:Key="SurfaceRaisedBrush" Color="{StaticResource SurfaceRaisedColor}" />
+  <SolidColorBrush x:Key="SurfaceHoverBrush" Color="{StaticResource SurfaceHoverColor}" />
+  <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+  <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtleColor}" />
+
+  <!-- ==== Text ==== -->
+  <SolidColorBrush x:Key="TextPrimaryBrush" Color="#FFF3F3F5" />
+  <SolidColorBrush x:Key="TextSecondaryBrush" Color="#FF9C9CA8" />
+  <SolidColorBrush x:Key="TextMutedBrush" Color="#FF6B6B78" />
+  <SolidColorBrush x:Key="TextOnAccentBrush" Color="#FFFFFFFF" />
+
+  <!-- ==== Accent ==== -->
+  <Color x:Key="AccentColor">#FFE8232A</Color>
+  <Color x:Key="AccentBrightColor">#FFFF3B43</Color>
+  <Color x:Key="AccentDeepColor">#FFB0161C</Color>
+
+  <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+  <SolidColorBrush x:Key="AccentBrightBrush" Color="{StaticResource AccentBrightColor}" />
+  <SolidColorBrush x:Key="AccentDeepBrush" Color="{StaticResource AccentDeepColor}" />
+  <SolidColorBrush x:Key="AccentGlowBrush" Color="#33E8232A" />
+  <SolidColorBrush x:Key="AccentWashBrush" Color="#1AE8232A" />
+
+  <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="1,1">
+    <GradientStop Color="{StaticResource AccentBrightColor}" Offset="0" />
+    <GradientStop Color="{StaticResource AccentColor}" Offset="0.55" />
+    <GradientStop Color="{StaticResource AccentDeepColor}" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- Backdrop wash behind the header, echoing the site's hero glow. -->
+  <RadialGradientBrush x:Key="HeroGlowBrush" GradientOrigin="0.25,0.1" Center="0.25,0.1" RadiusX="0.9" RadiusY="1.4">
+    <GradientStop Color="#2BE8232A" Offset="0" />
+    <GradientStop Color="#00000000" Offset="1" />
+  </RadialGradientBrush>
+
+  <!-- ==== Status ==== -->
+  <SolidColorBrush x:Key="OnlineBrush" Color="#FF2ED573" />
+  <SolidColorBrush x:Key="OnlineWashBrush" Color="#1F2ED573" />
+  <SolidColorBrush x:Key="OfflineBrush" Color="#FF6B6B78" />
+  <SolidColorBrush x:Key="WarningBrush" Color="#FFF5A524" />
+  <SolidColorBrush x:Key="WarningWashBrush" Color="#1FF5A524" />
+  <SolidColorBrush x:Key="DangerBrush" Color="#FFF04747" />
+  <SolidColorBrush x:Key="DangerWashBrush" Color="#1FF04747" />
+  <SolidColorBrush x:Key="InfoBrush" Color="#FF4C8DFF" />
+  <SolidColorBrush x:Key="InfoWashBrush" Color="#1F4C8DFF" />
+
+  <!-- ==== Typography ==== -->
+  <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI, system-ui</FontFamily>
+  <FontFamily x:Key="DisplayFont">Segoe UI Variable Display, Segoe UI Semibold, Segoe UI</FontFamily>
+  <FontFamily x:Key="MonoFont">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+  <sys:Double x:Key="FontSizeTiny">10.5</sys:Double>
+  <sys:Double x:Key="FontSizeSmall">11.5</sys:Double>
+  <sys:Double x:Key="FontSizeBody">13</sys:Double>
+  <sys:Double x:Key="FontSizeLarge">15</sys:Double>
+  <sys:Double x:Key="FontSizeTitle">19</sys:Double>
+  <sys:Double x:Key="FontSizeHero">27</sys:Double>
+
+  <!-- ==== Shape ==== -->
+  <CornerRadius x:Key="RadiusSmall">5</CornerRadius>
+  <CornerRadius x:Key="RadiusMedium">8</CornerRadius>
+  <CornerRadius x:Key="RadiusLarge">12</CornerRadius>
+  <CornerRadius x:Key="RadiusPill">999</CornerRadius>
+
+</ResourceDictionary>

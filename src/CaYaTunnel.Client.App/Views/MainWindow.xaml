@@ -1,0 +1,516 @@
+<Window x:Class="CaYaTunnel.Client.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:CaYaTunnel.Ui"
+        xmlns:vm="clr-namespace:CaYaTunnel.Client.App.ViewModels"
+        Title="CaYaTunnel"
+        Width="1080" Height="700" MinWidth="880" MinHeight="560"
+        WindowStartupLocation="CenterScreen"
+        Background="Transparent"
+        AllowsTransparency="True"
+        WindowStyle="None"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Ideal">
+
+  <Window.Resources>
+    <ui:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+    <ui:StringToVisibilityConverter x:Key="StringToVisibility" />
+    <ui:CountToVisibilityConverter x:Key="CountToVisibility" />
+    <ui:EqualityToVisibilityConverter x:Key="PageVisibility" />
+  </Window.Resources>
+
+  <Border Background="{StaticResource BackgroundBrush}"
+          BorderBrush="{StaticResource BorderBrush}"
+          BorderThickness="1"
+          CornerRadius="10">
+    <Grid>
+      <!-- The site's hero glow, kept faint so it reads as depth rather than decoration. -->
+      <Rectangle Fill="{StaticResource HeroGlowBrush}" Height="360" VerticalAlignment="Top" IsHitTestVisible="False" />
+
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ Title bar ============ -->
+        <Grid x:Name="TitleBar" Grid.Row="0" Height="46" Background="Transparent" MouseLeftButtonDown="TitleBar_Drag">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="18,0,0,0" VerticalAlignment="Center">
+            <TextBlock Text="CAYA" FontFamily="{StaticResource DisplayFont}" FontSize="15" FontWeight="Bold"
+                       Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+            <TextBlock Text="TUNNEL" FontFamily="{StaticResource DisplayFont}" FontSize="15" FontWeight="Bold"
+                       Foreground="{StaticResource TextPrimaryBrush}" VerticalAlignment="Center" />
+            <Border Style="{StaticResource Pill}" Background="{StaticResource SurfaceRaisedBrush}" Margin="12,0,0,0">
+              <TextBlock Text="{Binding DeviceName}" Style="{StaticResource MonoText}"
+                         Foreground="{StaticResource TextSecondaryBrush}" />
+            </Border>
+          </StackPanel>
+
+          <!-- Connection state, always visible: it is the first thing you look for. -->
+          <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Style="{StaticResource Pill}" Padding="12,5">
+              <Border.Background>
+                <SolidColorBrush Color="#FF17171D" />
+              </Border.Background>
+              <StackPanel Orientation="Horizontal">
+                <Ellipse Width="7" Height="7" VerticalAlignment="Center" Margin="0,0,8,0">
+                  <Ellipse.Style>
+                    <Style TargetType="Ellipse">
+                      <Setter Property="Fill" Value="{StaticResource OfflineBrush}" />
+                      <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsOnline}" Value="True">
+                          <Setter Property="Fill" Value="{StaticResource OnlineBrush}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                          <Setter Property="Fill" Value="{StaticResource WarningBrush}" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding IsUnauthorized}" Value="True">
+                          <Setter Property="Fill" Value="{StaticResource DangerBrush}" />
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Ellipse.Style>
+                </Ellipse>
+                <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding ServerName}" Style="{StaticResource MutedText}" Margin="10,0,0,0"
+                           VerticalAlignment="Center" />
+                <TextBlock Text="{Binding LatencyLabel}" Style="{StaticResource MonoText}"
+                           Foreground="{StaticResource TextMutedBrush}" Margin="10,0,0,0" VerticalAlignment="Center"
+                           Visibility="{Binding IsOnline, Converter={StaticResource BoolToVisibility}}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+
+          <StackPanel Grid.Column="2" Orientation="Horizontal">
+            <Button Style="{StaticResource CaptionButton}" Content="&#xE921;" Click="Minimise_Click"
+                    ToolTip="{ui:L Minimise}" />
+            <Button Style="{StaticResource CloseCaptionButton}" Content="&#xE8BB;" Click="Close_Click"
+                    ToolTip="{ui:L Close}" />
+          </StackPanel>
+        </Grid>
+
+        <!-- ============ Body ============ -->
+        <Grid Grid.Row="1">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="190" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+
+          <!-- Navigation -->
+          <StackPanel Grid.Column="0" Margin="12,6,6,12">
+            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" IsChecked="True"
+                         Command="{Binding GoToCommand}" CommandParameter="Tunnels">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE968;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                           Margin="0,0,11,0" VerticalAlignment="Center" />
+                <TextBlock Text="{ui:L NavTunnels}" VerticalAlignment="Center" />
+              </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
+                         Command="{Binding GoToCommand}" CommandParameter="Devices">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE977;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                           Margin="0,0,11,0" VerticalAlignment="Center" />
+                <TextBlock Text="{ui:L NavDevices}" VerticalAlignment="Center" />
+              </StackPanel>
+            </RadioButton>
+            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
+                         Command="{Binding GoToCommand}" CommandParameter="Settings">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock Text="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets" FontSize="14"
+                           Margin="0,0,11,0" VerticalAlignment="Center" />
+                <TextBlock Text="{ui:L NavSettings}" VerticalAlignment="Center" />
+              </StackPanel>
+            </RadioButton>
+
+            <!-- Connect / disconnect sits with navigation: it is a mode, not a page action. -->
+            <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="6,14,6,14" />
+
+            <Button Style="{StaticResource SecondaryButton}" Command="{Binding ConnectCommand}"
+                    Content="{ui:L Connect}" Margin="4,0,4,6"
+                    Visibility="{Binding IsOnline, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+            <Button Style="{StaticResource GhostButton}" Command="{Binding DisconnectCommand}"
+                    Content="{ui:L Disconnect}" Margin="4,0,4,6" HorizontalAlignment="Left"
+                    Visibility="{Binding IsOnline, Converter={StaticResource BoolToVisibility}}" />
+
+            <TextBlock Style="{StaticResource MutedText}" Margin="10,10,10,0" TextWrapping="Wrap"
+                       Text="{Binding StatusDetail}"
+                       Visibility="{Binding StatusDetail, Converter={StaticResource StringToVisibility}}" />
+          </StackPanel>
+
+          <!-- Content -->
+          <Grid Grid.Column="1" Margin="6,0,18,18">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Banner: remote deletions, refusals, errors -->
+            <Border Grid.Row="0" Margin="0,0,0,12" CornerRadius="{StaticResource RadiusMedium}"
+                    Padding="14,11" BorderThickness="1"
+                    Visibility="{Binding Banner, Converter={StaticResource StringToVisibility}}">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Background" Value="{StaticResource InfoWashBrush}" />
+                  <Setter Property="BorderBrush" Value="{StaticResource InfoBrush}" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding BannerSeverity}" Value="warning">
+                      <Setter Property="Background" Value="{StaticResource WarningWashBrush}" />
+                      <Setter Property="BorderBrush" Value="{StaticResource WarningBrush}" />
+                    </DataTrigger>
+                    <DataTrigger Binding="{Binding BannerSeverity}" Value="error">
+                      <Setter Property="Background" Value="{StaticResource DangerWashBrush}" />
+                      <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="*" />
+                  <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0">
+                  <TextBlock Text="{Binding Banner}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                             TextWrapping="Wrap" />
+                  <TextBlock Text="{Binding BannerDetail}" Style="{StaticResource SecondaryText}" Margin="0,3,0,0"
+                             TextWrapping="Wrap"
+                             Visibility="{Binding BannerDetail, Converter={StaticResource StringToVisibility}}" />
+                </StackPanel>
+                <Button Grid.Column="1" Style="{StaticResource CaptionButton}" Width="28" Height="28"
+                        Content="&#xE8BB;" Command="{Binding DismissBannerCommand}" VerticalAlignment="Top" />
+              </Grid>
+            </Border>
+
+            <!-- ==== Tunnels page ==== -->
+            <Grid Grid.Row="1"
+                  Visibility="{Binding PageName, Converter={StaticResource PageVisibility}, ConverterParameter=Tunnels}">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+
+              <Grid Grid.Row="0" Margin="0,0,0,14">
+                <StackPanel>
+                  <TextBlock Text="{ui:L TunnelsTitle}" Style="{StaticResource TitleText}" />
+                  <TextBlock Text="{ui:L TunnelsSubtitle}" Style="{StaticResource SecondaryText}" Margin="0,3,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <CheckBox Style="{StaticResource SwitchToggle}" IsChecked="{Binding ShowAllDevices}"
+                            Content="{ui:L ShowAllDevices}" Margin="0,0,14,0" />
+                  <Button Style="{StaticResource PrimaryButton}" Command="{Binding NewTunnelCommand}"
+                          Content="{ui:L NewTunnel}" />
+                </StackPanel>
+              </Grid>
+
+              <!-- Empty state -->
+              <Border Grid.Row="1" Style="{StaticResource Card}" VerticalAlignment="Top" Padding="34"
+                      Visibility="{Binding TunnelCount, Converter={StaticResource CountToVisibility}, ConverterParameter=invert}">
+                <StackPanel HorizontalAlignment="Center">
+                  <TextBlock Text="{ui:L NoTunnels}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" />
+                  <TextBlock Text="{ui:L NoTunnelsHint}" Style="{StaticResource MutedText}" Margin="0,6,0,0"
+                             HorizontalAlignment="Center" TextAlignment="Center" MaxWidth="380" TextWrapping="Wrap" />
+                </StackPanel>
+              </Border>
+
+              <ListBox Grid.Row="1" Style="{StaticResource CardList}" ItemsSource="{Binding Tunnels}"
+                       Visibility="{Binding TunnelCount, Converter={StaticResource CountToVisibility}}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:TunnelRow}">
+                    <Grid Margin="16,13">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+
+                      <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal">
+                          <Border Style="{StaticResource Pill}" Background="{Binding StatusWashBrush}" Padding="7,2">
+                            <TextBlock Text="{Binding KindLabel}" Style="{StaticResource MonoText}"
+                                       FontSize="10" FontWeight="Bold" Foreground="{Binding StatusBrush}" />
+                          </Border>
+                          <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                                     Margin="9,0,0,0" VerticalAlignment="Center" />
+                          <Border Style="{StaticResource Pill}" Background="{StaticResource SurfaceHoverBrush}"
+                                  Margin="9,0,0,0">
+                            <TextBlock Text="{Binding DeviceName}" Style="{StaticResource MutedText}" FontSize="10" />
+                          </Border>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                          <TextBlock Text="{Binding Endpoint}" Style="{StaticResource MonoText}"
+                                     Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                          <TextBlock Text="→" Style="{StaticResource MutedText}" Margin="9,0" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding TargetEndpoint}" Style="{StaticResource MonoText}"
+                                     Foreground="{StaticResource TextSecondaryBrush}" VerticalAlignment="Center" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,7,0,0">
+                          <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource MutedText}"
+                                     Foreground="{Binding StatusBrush}" />
+                          <TextBlock Text="·" Style="{StaticResource MutedText}" Margin="7,0" />
+                          <TextBlock Text="{Binding Traffic}" Style="{StaticResource MutedText}" />
+                          <TextBlock Text="·" Style="{StaticResource MutedText}" Margin="7,0"
+                                     Visibility="{Binding HasActiveConnections, Converter={StaticResource BoolToVisibility}}" />
+                          <StackPanel Orientation="Horizontal"
+                                      Visibility="{Binding HasActiveConnections, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{Binding ActiveConnections}" Style="{StaticResource MutedText}"
+                                       Foreground="{StaticResource OnlineBrush}" />
+                            <TextBlock Text="{ui:L ActiveNow}" Style="{StaticResource MutedText}" Margin="4,0,0,0" />
+                          </StackPanel>
+                        </StackPanel>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <Button Style="{StaticResource GhostButton}" Content="{ui:L Copy}"
+                                Command="{Binding DataContext.CopyEndpointCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                        <Button Style="{StaticResource GhostButton}"
+                                Command="{Binding DataContext.ToggleTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}">
+                          <TextBlock>
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock">
+                                <Setter Property="Text" Value="{ui:L Disable}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Enabled}" Value="False">
+                                    <Setter Property="Text" Value="{ui:L Enable}" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+                        </Button>
+                        <Button Style="{StaticResource GhostButton}" Content="{ui:L Delete}"
+                                Foreground="{StaticResource DangerBrush}"
+                                Command="{Binding DataContext.DeleteTunnelCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                CommandParameter="{Binding}" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
+
+            <!-- ==== Devices page ==== -->
+            <Grid Grid.Row="1"
+                  Visibility="{Binding PageName, Converter={StaticResource PageVisibility}, ConverterParameter=Devices}">
+              <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+              </Grid.RowDefinitions>
+
+              <StackPanel Grid.Row="0" Margin="0,0,0,14">
+                <TextBlock Text="{ui:L DevicesTitle}" Style="{StaticResource TitleText}" />
+                <TextBlock Text="{ui:L DevicesSubtitle}" Style="{StaticResource SecondaryText}" Margin="0,3,0,0" />
+              </StackPanel>
+
+              <ListBox Grid.Row="1" Style="{StaticResource CardList}" ItemsSource="{Binding Devices}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate DataType="{x:Type vm:DeviceRow}">
+                    <Grid Margin="16,13">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+
+                      <StackPanel Grid.Column="0">
+                        <StackPanel Orientation="Horizontal">
+                          <Ellipse Width="7" Height="7" Fill="{Binding StatusBrush}" VerticalAlignment="Center"
+                                   Margin="0,0,9,0" />
+                          <TextBlock Text="{Binding Name}" Style="{StaticResource BodyText}" FontWeight="SemiBold"
+                                     VerticalAlignment="Center" />
+                          <Border Style="{StaticResource Pill}" Background="{StaticResource AccentWashBrush}"
+                                  Margin="9,0,0,0"
+                                  Visibility="{Binding IsThisDevice, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{ui:L ThisDevice}" Style="{StaticResource MutedText}" FontSize="10"
+                                       Foreground="{StaticResource AccentBrush}" />
+                          </Border>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="16,8,0,0">
+                          <TextBlock Text="{ui:L LocalAddresses}" Style="{StaticResource MutedText}" />
+                          <TextBlock Text="{Binding LocalAddresses}" Style="{StaticResource MonoText}"
+                                     Foreground="{StaticResource TextSecondaryBrush}" Margin="7,0,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="16,5,0,0">
+                          <TextBlock Text="{Binding StatusLabel}" Style="{StaticResource MutedText}"
+                                     Foreground="{Binding StatusBrush}" />
+                          <TextBlock Text="·" Style="{StaticResource MutedText}" Margin="7,0" />
+                          <TextBlock Text="{Binding TunnelCount}" Style="{StaticResource MutedText}" />
+                          <TextBlock Text="{ui:L TunnelCount}" Style="{StaticResource MutedText}" Margin="4,0,0,0" />
+                          <TextBlock Text="·" Style="{StaticResource MutedText}" Margin="7,0" />
+                          <TextBlock Text="{Binding Latency}" Style="{StaticResource MutedText}" />
+                          <TextBlock Text="·" Style="{StaticResource MutedText}" Margin="7,0" />
+                          <TextBlock Text="{Binding LastSeen}" Style="{StaticResource MutedText}" />
+                        </StackPanel>
+                      </StackPanel>
+
+                      <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
+                        <TextBlock Text="{Binding RemoteAddress}" Style="{StaticResource MonoText}"
+                                   Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Right" />
+                        <TextBlock Text="{Binding ClientVersion}" Style="{StaticResource MutedText}"
+                                   HorizontalAlignment="Right" Margin="0,4,0,0" />
+                      </StackPanel>
+                    </Grid>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+            </Grid>
+
+            <!-- ==== Settings page ==== -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto"
+                          Visibility="{Binding PageName, Converter={StaticResource PageVisibility}, ConverterParameter=Settings}">
+              <ContentControl Content="{Binding SettingsPage}">
+                <ContentControl.ContentTemplate>
+                  <DataTemplate DataType="{x:Type vm:ClientSettingsViewModel}">
+                    <StackPanel Margin="0,0,10,0">
+
+                      <!-- Connection -->
+                      <TextBlock Text="{ui:L SectionConnection}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <TextBlock TextWrapping="Wrap" Margin="0,0,0,14">
+                            <TextBlock.Style>
+                              <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+                                <Setter Property="Text" Value="{ui:L ManualBuild}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding IsProvisioned}" Value="True">
+                                    <Setter Property="Text" Value="{ui:L ProvisionedBuild}" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </TextBlock.Style>
+                          </TextBlock>
+
+                          <TextBlock Text="{ui:L FieldServerHost}" Style="{StaticResource FieldLabel}" />
+                          <TextBox Style="{StaticResource FieldInput}" Text="{Binding ServerHost, UpdateSourceTrigger=PropertyChanged}"
+                                   IsEnabled="{Binding IsManual}" Margin="0,0,0,12" />
+
+                          <TextBlock Text="{ui:L FieldControlPort}" Style="{StaticResource FieldLabel}" />
+                          <TextBox Style="{StaticResource FieldInput}" Text="{Binding ControlPort, UpdateSourceTrigger=PropertyChanged}"
+                                   IsEnabled="{Binding IsManual}" Margin="0,0,0,12" Width="140"
+                                   HorizontalAlignment="Left" />
+
+                          <StackPanel Visibility="{Binding IsManual, Converter={StaticResource BoolToVisibility}}">
+                            <TextBlock Text="{ui:L FieldEnrollmentKey}" Style="{StaticResource FieldLabel}" />
+                            <TextBox Style="{StaticResource MonoFieldInput}"
+                                     Text="{Binding EnrollmentKey, UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,12" />
+
+                            <TextBlock Text="{ui:L FieldFingerprint}" Style="{StaticResource FieldLabel}" />
+                            <TextBox Style="{StaticResource MonoFieldInput}"
+                                     Text="{Binding CertificateFingerprint, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Text="{ui:L FieldFingerprintHint}" Style="{StaticResource FieldHint}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+
+                      <!-- Identity -->
+                      <TextBlock Text="{ui:L SectionIdentity}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <TextBlock Text="{ui:L DeviceName}" Style="{StaticResource FieldLabel}" />
+                          <TextBox Style="{StaticResource FieldInput}" Text="{Binding DeviceName, UpdateSourceTrigger=PropertyChanged}" />
+                          <TextBlock Text="{ui:L DeviceNameHint}" Style="{StaticResource FieldHint}" />
+
+                          <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,16" />
+
+                          <TextBlock Text="{ui:L SettingsLocation}" Style="{StaticResource FieldLabel}" />
+                          <TextBlock Text="{Binding SettingsPath}" Style="{StaticResource MonoText}"
+                                     Foreground="{StaticResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding StorageModeLabel}" Style="{StaticResource FieldHint}" />
+                          <Button Style="{StaticResource LinkButton}" Content="{ui:L Open}" Margin="0,8,0,0"
+                                  Command="{Binding OpenSettingsFolderCommand}" />
+
+                          <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="0,16" />
+
+                          <Button Style="{StaticResource DangerButton}" Content="{ui:L ForgetDevice}"
+                                  HorizontalAlignment="Left" Command="{Binding ForgetCommand}" />
+                          <TextBlock Text="{ui:L ForgetDeviceHint}" Style="{StaticResource FieldHint}" />
+                        </StackPanel>
+                      </Border>
+
+                      <!-- Startup -->
+                      <TextBlock Text="{ui:L SectionStartup}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L StartWithWindows}"
+                                    IsChecked="{Binding StartWithWindows}" Margin="0,0,0,12" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L StartMinimised}"
+                                    IsChecked="{Binding StartMinimised}" Margin="0,0,0,12" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L StartElevated}"
+                                    IsChecked="{Binding StartElevated}" />
+                          <TextBlock Text="{ui:L StartElevatedHint}" Style="{StaticResource FieldHint}" />
+                          <Button Style="{StaticResource LinkButton}" Margin="0,8,0,0"
+                                  Content="Restart as administrator"
+                                  Command="{Binding RelaunchElevatedCommand}"
+                                  Visibility="{Binding CanElevate, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                        </StackPanel>
+                      </Border>
+
+                      <!-- Application -->
+                      <TextBlock Text="{ui:L SectionApplication}" Style="{StaticResource SectionLabel}" />
+                      <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                        <StackPanel>
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L ConnectOnLaunch}"
+                                    IsChecked="{Binding ConnectOnLaunch}" Margin="0,0,0,12" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L CloseToTray}"
+                                    IsChecked="{Binding CloseToTray}" Margin="0,0,0,12" />
+                          <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L ShowNotifications}"
+                                    IsChecked="{Binding ShowNotifications}" Margin="0,0,0,16" />
+
+                          <TextBlock Text="{ui:L Language}" Style="{StaticResource FieldLabel}" />
+                          <ComboBox Style="{StaticResource FieldCombo}" ItemContainerStyle="{StaticResource FieldComboItem}"
+                                    SelectedIndex="{Binding LanguageIndex}" Width="220" HorizontalAlignment="Left">
+                            <ComboBoxItem Content="{ui:L LanguageSystem}" />
+                            <ComboBoxItem Content="{ui:L LanguageTurkish}" />
+                            <ComboBoxItem Content="{ui:L LanguageEnglish}" />
+                          </ComboBox>
+                        </StackPanel>
+                      </Border>
+
+                      <StackPanel Orientation="Horizontal" Margin="0,0,0,24">
+                        <Button Style="{StaticResource PrimaryButton}" Content="{ui:L Save}"
+                                Command="{Binding SaveCommand}" />
+                        <TextBlock Text="{Binding Message}"
+                                   VerticalAlignment="Center" Margin="14,0,0,0" TextWrapping="Wrap"
+                                   Visibility="{Binding Message, Converter={StaticResource StringToVisibility}}">
+                          <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource SecondaryText}">
+                              <Style.Triggers>
+                                <DataTrigger Binding="{Binding MessageIsError}" Value="True">
+                                  <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+                                </DataTrigger>
+                              </Style.Triggers>
+                            </Style>
+                          </TextBlock.Style>
+                        </TextBlock>
+                      </StackPanel>
+                    </StackPanel>
+                  </DataTemplate>
+                </ContentControl.ContentTemplate>
+              </ContentControl>
+            </ScrollViewer>
+          </Grid>
+        </Grid>
+
+        <!-- Toast -->
+        <Border Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,26"
+                Background="{StaticResource SurfaceRaisedBrush}" BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="1" CornerRadius="{StaticResource RadiusPill}" Padding="18,9"
+                Visibility="{Binding Toast, Converter={StaticResource StringToVisibility}}">
+          <TextBlock Text="{Binding Toast}" Style="{StaticResource BodyText}" />
+        </Border>
+      </Grid>
+    </Grid>
+  </Border>
+</Window>
