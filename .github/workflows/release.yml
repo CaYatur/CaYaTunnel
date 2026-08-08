@@ -1,0 +1,82 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v1.0.0)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Test before publishing
+        run: dotnet test tests/CaYaTunnel.Core.Tests/CaYaTunnel.Core.Tests.csproj --configuration Release
+        timeout-minutes: 15
+
+      # The client is the artifact that matters most. The gateway hands out ready-to-run clients
+      # by copying this executable and appending configuration to its tail, so a release that
+      # ships it is what makes "download and run" true for anyone who is not the author.
+      - name: Publish client (single file, self-contained)
+        run: dotnet publish src/CaYaTunnel.Client.App -c Release -o artifacts/client
+
+      - name: Publish server
+        run: dotnet publish src/CaYaTunnel.Server.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -o artifacts/server
+
+      # The server looks for the client template beside its own executable, so shipping them
+      # together means client builds work the moment the archive is unpacked.
+      - name: Bundle the client template with the server
+        run: Copy-Item artifacts/client/CaYaTunnelClient.exe artifacts/server/CaYaTunnelClient.exe
+        shell: pwsh
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts/release | Out-Null
+          Compress-Archive -Path artifacts/server/* -DestinationPath artifacts/release/CaYaTunnel-Server-win-x64.zip
+          Copy-Item artifacts/client/CaYaTunnelClient.exe artifacts/release/CaYaTunnelClient.exe
+
+      - name: Verify the published client reads its own configuration blob
+        shell: pwsh
+        run: |
+          # Guards the provisioning format against a publish-setting change. A stub must report
+          # itself as unprovisioned; anything else means the tail read is broken.
+          $exe = "artifacts/release/CaYaTunnelClient.exe"
+          & $exe --dump-config "$env:TEMP/stub-config.json"
+          Start-Sleep -Seconds 3
+          $report = Get-Content "$env:TEMP/stub-config.json" | ConvertFrom-Json
+          if ($report.Provisioned -ne $false) { throw "A plain stub reported itself as provisioned." }
+          Write-Host "Client stub reads its tail correctly."
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          files: |
+            artifacts/release/CaYaTunnel-Server-win-x64.zip
+            artifacts/release/CaYaTunnelClient.exe
+          body: |
+            **CaYaTunnel ${{ github.event.inputs.tag || github.ref_name }}**
+
+            - `CaYaTunnel-Server-win-x64.zip` — the gateway for your VPS. Unpack and run
+              `CaYaTunnelServer.exe`. The client template is already inside, so **Client builds**
+              works immediately.
+            - `CaYaTunnelClient.exe` — a plain client. It has no server configured; either build
+              one from the gateway's **Client builds** screen, or enter the details by hand in
+              its settings.
+
+            Provisioned clients are unsigned by design — the gateway appends configuration to the
+            executable's tail, which invalidates any signature. See the README for why.

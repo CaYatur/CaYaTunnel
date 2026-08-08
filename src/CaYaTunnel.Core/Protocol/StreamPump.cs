@@ -24,18 +24,17 @@ public static class StreamPump
         var toTarget = CopyAsync(mux, target, linked.Token);
         var fromTarget = CopyAsync(target, mux, linked.Token);
 
-        // Wait for the first direction to end, then give the other a moment to drain rather
-        // than cutting a half-closed connection short (HTTP responses arrive after the request
-        // body ends; a Minecraft client stops sending long before the server stops talking).
-        var first = await Task.WhenAny(toTarget, fromTarget).ConfigureAwait(false);
-        _ = first; // surfaced below via the awaits
-
+        // Both directions run to their own end. There is deliberately no time limit here: one
+        // direction finishing says nothing about the other, and a half-closed connection is
+        // normal — an HTTP response arrives after the request body ends, and a Minecraft client
+        // stops sending long before the server stops talking. A deadline would cut a long
+        // download or an idle session for no reason. A genuinely dead link is caught by the
+        // link's keep-alive, which faults every stream it carried.
         try
         {
-            await Task.WhenAll(toTarget, fromTarget).WaitAsync(TimeSpan.FromMinutes(5), cancellationToken)
-                .ConfigureAwait(false);
+            await Task.WhenAll(toTarget, fromTarget).ConfigureAwait(false);
         }
-        catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+        catch (Exception ex) when (ex is OperationCanceledException)
         {
             await linked.CancelAsync().ConfigureAwait(false);
         }

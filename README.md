@@ -69,10 +69,17 @@ permanent redirect from HTTP to HTTPS.
 
 ## Getting started
 
+Download from [Releases](https://github.com/CaYatur/CaYaTunnel/releases):
+
+- **`CaYaTunnel-Server-win-x64.zip`** — the gateway. Unpack it on your VPS. The client
+  template is already inside, so client builds work the moment you unpack.
+- **`CaYaTunnelClient.exe`** — a plain client, for setting one up by hand. You normally do
+  not need this: the gateway builds configured clients for you.
+
 ### 1. The gateway, on your VPS
 
-Requires Windows Server 2019 or newer (Windows 10/11 works too) and the
-[.NET 10 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+Windows Server 2019 or newer; Windows 10/11 works too. The release archive is
+self-contained, so no runtime install is needed.
 
 1. Run `CaYaTunnelServer.exe`.
 2. Open **Settings** and fill in:
@@ -195,7 +202,8 @@ dotnet publish src/CaYaTunnel.Client.App -c Release -o artifacts/client
 ```
 
 Put the result next to `CaYaTunnelServer.exe`, or point at it from **Client builds →
-Choose client template**.
+Choose client template**. The release archive already contains it; you only need this when
+building from source.
 
 > The single-file publish settings in `CaYaTunnel.Client.App.csproj` are load-bearing.
 > Provisioning appends a configuration blob to the executable's tail, so a change that

@@ -123,6 +123,26 @@ public sealed class ServerConfig
         Features = ["http-router", "minecraft-router", "tcp-ports", "realtime-events", "client-provisioning"],
     };
 
+    /// <summary>
+    /// Ports the gateway binds for itself, which must never be allocated to a tunnel. Only the
+    /// routers that are actually enabled are reserved, so turning one off frees its port.
+    /// </summary>
+    public IEnumerable<(string Name, int Port)> ReservedPorts()
+    {
+        yield return ("control port", ControlPort);
+
+        if (EnableHttpRouter)
+        {
+            yield return ("HTTP port", HttpPort);
+            yield return ("HTTPS port", HttpsPort);
+        }
+
+        if (EnableMinecraftRouter)
+        {
+            yield return ("Minecraft port", MinecraftPort);
+        }
+    }
+
     /// <summary>Problems that would stop the gateway from starting, in operator language.</summary>
     public IReadOnlyList<string> Validate()
     {
@@ -147,9 +167,14 @@ public sealed class ServerConfig
             problems.Add("TCP port range ends before it starts.");
         }
 
-        if (ControlPort >= TcpPortRangeStart && ControlPort <= TcpPortRangeEnd)
+        // Every port the gateway binds for itself has to stay clear of the range it hands out,
+        // or a tunnel gets allocated a port that is already in use and simply fails to bind.
+        foreach (var (name, port) in ReservedPorts())
         {
-            problems.Add("The control port falls inside the TCP tunnel range and would be handed out to a tunnel.");
+            if (port >= TcpPortRangeStart && port <= TcpPortRangeEnd)
+            {
+                problems.Add($"The {name} ({port}) falls inside the tunnel port range and would be handed out to a tunnel.");
+            }
         }
 
         if (string.IsNullOrWhiteSpace(PublicHost))

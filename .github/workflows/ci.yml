@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Windows, not Linux: the applications are WPF and the gateway's tests exercise Schannel,
+    # DPAPI and the Windows certificate store. A Linux run would pass while proving nothing.
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore CaYaTunnel.slnx
+
+      - name: Build
+        run: dotnet build CaYaTunnel.slnx --configuration Release --no-restore
+
+      - name: Test
+        # The integration tests bind real loopback sockets and complete a real TLS handshake,
+        # so they need a few seconds each; the default timeout is plenty but stated for clarity.
+        run: dotnet test tests/CaYaTunnel.Core.Tests/CaYaTunnel.Core.Tests.csproj --configuration Release --no-build --verbosity normal
+        timeout-minutes: 15

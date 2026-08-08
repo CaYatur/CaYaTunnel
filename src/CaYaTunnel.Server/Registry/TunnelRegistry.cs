@@ -502,9 +502,13 @@ public sealed class TunnelRegistry
                 throw new TunnelValidationException("Public port must be between 1 and 65535.");
             }
 
-            if (port == config.ControlPort)
+            // Every port the gateway already listens on, not just the control port: handing a
+            // tunnel port 443 would produce a tunnel that exists but can never bind.
+            var reserved = config.ReservedPorts().FirstOrDefault(r => r.Port == port);
+            if (reserved.Name is not null)
             {
-                throw new TunnelValidationException("That is the control port clients connect on; pick another.");
+                throw new TunnelValidationException(
+                    $"Port {port} is the gateway's {reserved.Name}; pick another.");
             }
 
             if (_tunnels.Values.Any(t => t.Kind == TunnelKind.PortForward && t.PublicPort == port))
@@ -520,9 +524,14 @@ public sealed class TunnelRegistry
             .Select(t => t.PublicPort!.Value)
             .ToHashSet();
 
+        foreach (var (_, reservedPort) in config.ReservedPorts())
+        {
+            taken.Add(reservedPort);
+        }
+
         for (var candidate = config.TcpPortRangeStart; candidate <= config.TcpPortRangeEnd; candidate++)
         {
-            if (candidate != config.ControlPort && taken.Add(candidate))
+            if (taken.Add(candidate))
             {
                 return candidate;
             }

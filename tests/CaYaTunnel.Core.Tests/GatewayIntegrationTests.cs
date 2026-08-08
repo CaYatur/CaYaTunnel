@@ -396,6 +396,26 @@ public class GatewayIntegrationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_port_the_gateway_already_listens_on_is_refused()
+    {
+        await using var service = EchoServer.Start();
+        var client = await ConnectClientAsync("CAGAN-PC");
+
+        // Allocating the HTTPS port to a tunnel would create one that can never bind, so it has
+        // to be refused up front rather than logged when the listener fails.
+        var result = await client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Kind = TunnelKind.PortForward,
+            PublicPort = _config.HttpsPort,
+            TargetHost = "127.0.0.1",
+            TargetPort = service.Port,
+        });
+
+        Assert.False(result.Ok);
+        Assert.Contains("HTTPS port", result.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task A_duplicate_hostname_is_rejected_with_a_readable_message()
     {
         await using var service = EchoServer.Start();
