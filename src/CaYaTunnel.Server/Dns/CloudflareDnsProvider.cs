@@ -82,7 +82,7 @@ public sealed class CloudflareDnsProvider(
         ArgumentException.ThrowIfNullOrWhiteSpace(hostname);
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
 
-        var existing = await FindRecordAsync(hostname, cancellationToken).ConfigureAwait(false);
+        var existing = await FindRecordAsync(hostname, cancellationToken, "TXT").ConfigureAwait(false);
         var body = new CloudflareRecordRequest
         {
             Type = "TXT",
@@ -211,12 +211,18 @@ public sealed class CloudflareDnsProvider(
         }
     }
 
-    private async Task<string?> FindRecordAsync(string hostname, CancellationToken cancellationToken)
+    private async Task<string?> FindRecordAsync(
+        string hostname,
+        CancellationToken cancellationToken,
+        string? type = null)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            $"{ApiRoot}/zones/{_zoneId}/dns_records?name={Uri.EscapeDataString(hostname)}");
+        var url = $"{ApiRoot}/zones/{_zoneId}/dns_records?name={Uri.EscapeDataString(hostname)}";
+        if (!string.IsNullOrWhiteSpace(type))
+        {
+            url += $"&type={Uri.EscapeDataString(type)}";
+        }
 
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         var records = await SendAsync<List<CloudflareRecordResult>>(request, cancellationToken).ConfigureAwait(false);
         return records is { Count: > 0 } ? records[0].Id : null;
     }

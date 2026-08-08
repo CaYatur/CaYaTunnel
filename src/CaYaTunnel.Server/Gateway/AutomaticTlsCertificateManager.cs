@@ -1,4 +1,6 @@
+using System.Net.Http.Headers;
 using System.Security.Cryptography.X509Certificates;
+using System.Text.Json;
 using CaYaTunnel.Server.Configuration;
 using CaYaTunnel.Server.Dns;
 using Certes;
@@ -15,6 +17,11 @@ internal static class AutomaticTlsCertificateManager
 {
     private static readonly TimeSpan RenewBefore = TimeSpan.FromDays(30);
     private static readonly TimeSpan ValidationTimeout = TimeSpan.FromMinutes(3);
+    private static readonly TimeSpan DnsPropagationTimeout = TimeSpan.FromMinutes(2);
+    private static readonly HttpClient PublicDnsHttp = new()
+    {
+        Timeout = TimeSpan.FromSeconds(10),
+    };
 
     public static bool NeedsRenewal(string path)
     {
@@ -86,10 +93,21 @@ internal static class AutomaticTlsCertificateManager
                 recordId = await dns.CreateTxtRecordAsync(challengeName, txtValue, cancellationToken)
                     .ConfigureAwait(false);
 
-                // Cloudflare's authoritative DNS is usually quick, but giving it a short settling
-                // window avoids asking Let's Encrypt before the TXT record reaches all nameservers.
-                await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken).ConfigureAwait(false);
-                await challenge.Validate().ConfigureAwait(false);
+                // Do not acknowledge the ACME challenge until the exact TXT value is visible from
+                // a public recursive resolver. A fixed delay is unreliable and can turn an otherwise
+                // valid DNS-01 challenge permanently Invalid before Cloudflare propagation finishes.
+                await WaitForTxtPropagationAsync(challengeName, txtValue, cancellationToken)
+                    .ConfigureAwait(false);
+
+                var challengeResult = await challenge.Validate().ConfigureAwait(false);
+                if (challengeResult.Status == ChallengeStatus.Invalid)
+                {
+                    var detail = challengeResult.Error?.Detail;
+                    throw new InvalidOperationException(
+                        string.IsNullOrWhiteSpace(detail)
+                            ? "Let's Encrypt rejected the DNS-01 challenge."
+                            : $"Let's Encrypt rejected the DNS-01 challenge: {detail}");
+                }
 
                 var deadline = DateTimeOffset.UtcNow + ValidationTimeout;
                 while (DateTimeOffset.UtcNow < deadline)
@@ -163,5 +181,71 @@ internal static class AutomaticTlsCertificateManager
 
         File.Move(tempPath, ServerPaths.AutomaticPublicCertificateFile, overwrite: true);
         return true;
+    }
+
+    private static async Task WaitForTxtPropagationAsync(
+        string hostname,
+        string expectedValue,
+        CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow + DnsPropagationTimeout;
+        Exception? lastError = null;
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            try
+            {
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"https://cloudflare-dns.com/dns-query?name={Uri.EscapeDataString(hostname)}&type=TXT");
+                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/dns-json"));
+
+                using var response = await PublicDnsHttp.SendAsync(request, cancellationToken)
+                    .ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+                    .ConfigureAwait(false);
+                using var document = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (document.RootElement.TryGetProperty("Answer", out var answers)
+                    && answers.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var answer in answers.EnumerateArray())
+                    {
+                        if (!answer.TryGetProperty("data", out var dataElement))
+                        {
+                            continue;
+                        }
+
+                        var data = dataElement.GetString()?.Trim();
+                        if (string.IsNullOrEmpty(data))
+                        {
+                            continue;
+                        }
+
+                        // DNS JSON represents TXT RDATA with surrounding quotes.
+                        data = data.Trim('"').Replace("\\\"", "\"");
+                        if (string.Equals(data, expectedValue, StringComparison.Ordinal))
+                        {
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
+            {
+                lastError = ex;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(3), cancellationToken).ConfigureAwait(false);
+        }
+
+        throw new TimeoutException(
+            $"DNS-01 TXT record '{hostname}' did not become publicly visible within {DnsPropagationTimeout.TotalSeconds:0} seconds."
+            + (lastError is null ? "" : $" Last DNS check error: {lastError.Message}"));
     }
 }
