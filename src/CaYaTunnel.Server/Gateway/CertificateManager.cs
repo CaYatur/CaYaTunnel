@@ -31,23 +31,73 @@ public static class CertificateManager
     /// Loads the certificate at <paramref name="path"/>, generating and persisting a self-signed
     /// one if it is missing.
     /// </summary>
+    /// <summary>
+    /// Which file the public HTTPS listeners should present, and whether this caller is allowed
+    /// to generate one if it is missing.
+    /// <para>
+    /// The rule that matters is <c>MayCreate</c> being false for the automatic certificate.
+    /// Writing a self-signed stand-in into that path is quietly fatal: the renewal check would
+    /// find a certificate valid for ten years, decide nothing is due, and never ask Let's Encrypt
+    /// again — while every visitor kept seeing an untrusted certificate.
+    /// </para>
+    /// </summary>
+    public static (string Path, string Password, bool MayCreate) ChoosePublicCertificate(
+        Configuration.ServerConfig config,
+        bool automaticCertificateExists)
+    {
+        if (config.AutomaticTlsEnabled)
+        {
+            return automaticCertificateExists
+                ? (Configuration.ServerPaths.AutomaticPublicCertificateFile, "", false)
+                // Nothing issued yet. Serve the self-signed fallback from its own file until the
+                // background renewal lands a real one.
+                : (Configuration.ServerPaths.PublicCertificateFile, "", true);
+        }
+
+        return string.IsNullOrWhiteSpace(config.PublicTlsCertificatePath)
+            ? (Configuration.ServerPaths.PublicCertificateFile, "", true)
+            : (config.PublicTlsCertificatePath, config.PublicTlsCertificatePassword, true);
+    }
+
+    /// <summary>
+    /// Reads an existing certificate. Separate from <see cref="LoadOrCreate"/> for the callers
+    /// that must never fall back to generating one — an automatically issued certificate replaced
+    /// by a self-signed stand-in would keep serving, untrusted, while looking healthy.
+    /// </summary>
+    public static X509Certificate2 Load(string path, string password)
+    {
+        // PKCS#12 does not agree with itself about "no password": some writers produce a file
+        // that opens with an empty string and not with null, and some the other way round. The
+        // ACME library writes one and this code reads it, so trying both removes a whole class
+        // of "the certificate is right there and it will not load".
+        var attempts = string.IsNullOrEmpty(password)
+            ? new string?[] { null, "" }
+            : [password];
+
+        CryptographicException? failure = null;
+
+        foreach (var attempt in attempts)
+        {
+            try
+            {
+                return X509CertificateLoader.LoadPkcs12FromFile(path, attempt, StorageFlags);
+            }
+            catch (CryptographicException ex)
+            {
+                failure = ex;
+            }
+        }
+
+        throw new InvalidOperationException(
+            $"Could not open the certificate at '{path}'. If it has a password, set it in the server settings. ({failure?.Message})",
+            failure);
+    }
+
     public static X509Certificate2 LoadOrCreate(string path, string password, string subjectName)
     {
         if (File.Exists(path))
         {
-            try
-            {
-                return X509CertificateLoader.LoadPkcs12FromFile(
-                    path,
-                    string.IsNullOrEmpty(password) ? null : password,
-                    StorageFlags);
-            }
-            catch (CryptographicException ex)
-            {
-                throw new InvalidOperationException(
-                    $"Could not open the certificate at '{path}'. If it has a password, set it in the server settings. ({ex.Message})",
-                    ex);
-            }
+            return Load(path, password);
         }
 
         var created = CreateSelfSigned(subjectName);

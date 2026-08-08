@@ -99,23 +99,7 @@ public sealed partial class TunnelServer : IAsyncDisposable
 
         ControlCertificateFingerprint = CertificateManager.Fingerprint(_controlCertificate);
 
-        if (Config.AutomaticTlsEnabled)
-        {
-            await AutomaticTlsCertificateManager.EnsureCertificateAsync(Config, cancellationToken: token)
-                .ConfigureAwait(false);
-        }
-
-        var publicCertificatePath = Config.AutomaticTlsEnabled
-            ? ServerPaths.AutomaticPublicCertificateFile
-            : string.IsNullOrWhiteSpace(Config.PublicTlsCertificatePath)
-                ? ServerPaths.PublicCertificateFile
-                : Config.PublicTlsCertificatePath;
-        var publicCertificatePassword = Config.AutomaticTlsEnabled ? "" : Config.PublicTlsCertificatePassword;
-
-        _publicCertificate = CertificateManager.LoadOrCreate(
-            publicCertificatePath,
-            publicCertificatePassword,
-            string.IsNullOrWhiteSpace(Config.BaseDomain) ? "cayatunnel-public" : $"*.{Config.BaseDomain}");
+        _publicCertificate = LoadPublicCertificate();
 
         _dns = CreateDnsProvider(Config);
 
@@ -136,31 +120,82 @@ public sealed partial class TunnelServer : IAsyncDisposable
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Picks the certificate the public HTTPS listeners present.
+    /// <para>
+    /// The ACME file is only ever read, never created here. Letting the self-signed fallback be
+    /// written into that path would be quietly fatal: the renewal check would then find a
+    /// certificate valid for ten years, conclude nothing is due, and automatic HTTPS would never
+    /// run again — while visitors kept seeing an untrusted certificate.
+    /// </para>
+    /// </summary>
+    private X509Certificate2 LoadPublicCertificate()
+    {
+        var subject = string.IsNullOrWhiteSpace(Config.BaseDomain) ? "cayatunnel-public" : $"*.{Config.BaseDomain}";
+
+        var (path, password, mayCreate) = CertificateManager.ChoosePublicCertificate(
+            Config,
+            File.Exists(ServerPaths.AutomaticPublicCertificateFile));
+
+        if (mayCreate)
+        {
+            return CertificateManager.LoadOrCreate(path, password, subject);
+        }
+
+        try
+        {
+            return CertificateManager.Load(path, password);
+        }
+        catch (InvalidOperationException ex)
+        {
+            // Serving something is better than refusing to start; the renewal loop replaces it.
+            Log.Error("gateway", $"Could not read the automatic HTTPS certificate, falling back: {ex.Message}");
+            return CertificateManager.LoadOrCreate(ServerPaths.PublicCertificateFile, "", subject);
+        }
+    }
+
+    /// <summary>
+    /// Obtains the certificate on a background loop rather than during startup.
+    /// <para>
+    /// Acquisition talks to Cloudflare and Let's Encrypt and waits for DNS to propagate, which
+    /// takes minutes and can fail for reasons that have nothing to do with this machine. Doing it
+    /// inside <see cref="StartAsync"/> would freeze the UI for that long and, worse, let a
+    /// transient outage stop the gateway from starting at all — taking down every tunnel,
+    /// including all the ones that need no certificate.
+    /// </para>
+    /// </summary>
     private async Task RunAutomaticTlsRenewalAsync(CancellationToken cancellationToken)
     {
+        // The first check happens immediately: on a fresh install there is no certificate yet,
+        // and waiting half a day before asking for one is not a sane first run.
+        var delay = TimeSpan.Zero;
+
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await Task.Delay(TimeSpan.FromHours(12), cancellationToken).ConfigureAwait(false);
+                if (delay > TimeSpan.Zero)
+                {
+                    await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                }
+
+                delay = TimeSpan.FromHours(12);
+
                 if (!AutomaticTlsCertificateManager.NeedsRenewal(ServerPaths.AutomaticPublicCertificateFile))
                 {
                     continue;
                 }
 
-                Log.Info("gateway", "Automatic HTTPS certificate is nearing expiry; starting renewal.");
+                Log.Info("gateway", "Requesting a browser-trusted certificate from Let's Encrypt.");
                 var renewed = await AutomaticTlsCertificateManager
                     .EnsureCertificateAsync(Config, cancellationToken: cancellationToken)
                     .ConfigureAwait(false);
 
                 if (renewed)
                 {
-                    var replacement = CertificateManager.LoadOrCreate(
-                        ServerPaths.AutomaticPublicCertificateFile,
-                        "",
-                        string.IsNullOrWhiteSpace(Config.BaseDomain) ? "cayatunnel-public" : $"*.{Config.BaseDomain}");
+                    var replacement = CertificateManager.Load(ServerPaths.AutomaticPublicCertificateFile, "");
                     _publicCertificate = replacement;
-                    Log.Info("gateway", $"Automatic HTTPS certificate renewed; valid until {replacement.NotAfter:u}.");
+                    Log.Info("gateway", $"Automatic HTTPS certificate installed; valid until {replacement.NotAfter:u}.");
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -169,9 +204,15 @@ public sealed partial class TunnelServer : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                // Keep serving the existing certificate and retry later. Renewal starts 30 days
-                // before expiry, so a transient DNS/ACME outage does not take the gateway down.
-                Log.Error("gateway", $"Automatic HTTPS renewal failed: {ex.Message}");
+                // Keep serving whatever is loaded and try again later. Renewal begins 30 days
+                // before expiry, so there is room for a long outage.
+                Log.Error("gateway", $"Automatic HTTPS failed: {ex.Message}");
+                ReportListenerFailure($"Automatic HTTPS could not be set up: {ex.Message}");
+
+                // Retry sooner than the usual cycle when there is no certificate at all yet.
+                delay = File.Exists(ServerPaths.AutomaticPublicCertificateFile)
+                    ? TimeSpan.FromHours(12)
+                    : TimeSpan.FromMinutes(15);
             }
         }
     }

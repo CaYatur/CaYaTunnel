@@ -370,10 +370,22 @@ public sealed partial class TunnelServer
         }
         catch (SocketException ex)
         {
-            // Loud, not just logged: a port that is already taken means this listener silently
-            // does nothing, and the operator needs to know which one and why.
-            var message = $"Port {port} ({label}) is already in use by something else, so it was not opened. "
-                + "Turn on single-port mode, or change the port, or stop whatever is using it.";
+            // Loud, not just logged: a port that is not bound means this listener silently does
+            // nothing, and the operator needs to know which one and why. The two causes need
+            // different answers, so they are not collapsed into one message — a reserved range
+            // cannot be freed by stopping anything.
+            var message = ex.SocketErrorCode switch
+            {
+                SocketError.AddressAlreadyInUse =>
+                    $"Port {port} ({label}) is already in use by something else, so it was not opened. "
+                    + "Turn on single-port mode, or change the port, or stop whatever is using it.",
+
+                SocketError.AccessDenied =>
+                    $"Port {port} ({label}) could not be opened: Windows reserves it, or this account may not bind it. "
+                    + "Check with: netsh int ipv4 show excludedportrange protocol=tcp",
+
+                _ => $"Port {port} ({label}) could not be opened — {ex.SocketErrorCode}: {ex.Message}",
+            };
 
             Log.Error("gateway", message);
             ListenerFailed?.Invoke(message);

@@ -69,8 +69,11 @@ internal static class AutomaticTlsCertificateManager
             proxied: false,
             ttl: 60);
 
-        var accountKey = KeyFactory.NewKey(KeyAlgorithm.ES256);
+        var accountKey = LoadOrCreateAccountKey();
         var acme = new AcmeContext(WellKnownServers.LetsEncryptV2, accountKey);
+
+        // With a key it has seen before, ACME returns the existing account rather than making
+        // another one, so this is safe to call on every renewal.
         await acme.NewAccount(config.AutomaticTlsEmail.Trim(), termsOfServiceAgreed: true)
             .ConfigureAwait(false);
 
@@ -181,6 +184,66 @@ internal static class AutomaticTlsCertificateManager
 
         File.Move(tempPath, ServerPaths.AutomaticPublicCertificateFile, overwrite: true);
         return true;
+    }
+
+    /// <summary>
+    /// The ACME account key, kept between runs.
+    /// <para>
+    /// Generating a fresh key would register a brand new Let's Encrypt account on every
+    /// certificate request, and Let's Encrypt caps new accounts per IP address — a gateway that
+    /// restarts a few times, or simply renews often enough, would start being refused. Reusing
+    /// one key also keeps the account's issuance history intact, which is what its rate limits
+    /// are measured against.
+    /// </para>
+    /// <para>
+    /// The key is an account credential, so it is encrypted at rest the same way the enrollment
+    /// key and the Cloudflare token are.
+    /// </para>
+    /// </summary>
+    internal static IKey LoadOrCreateAccountKey(string? keyPath = null)
+    {
+        var path = keyPath ?? ServerPaths.AcmeAccountKeyFile;
+
+        if (File.Exists(path))
+        {
+            try
+            {
+                var stored = SecretProtector.Unprotect(File.ReadAllText(path));
+                if (!string.IsNullOrWhiteSpace(stored))
+                {
+                    return KeyFactory.FromPem(stored);
+                }
+            }
+            catch (Exception)
+            {
+                // Deliberately broad. This file can be unreadable, truncated, copied from another
+                // machine so DPAPI cannot recover it, or written by a future version — and the
+                // PEM parser reports each of those differently, including NotSupportedException.
+                // Every one of them has the same right answer: register a new account. Narrowing
+                // this would turn a recoverable situation into a gateway that cannot get a
+                // certificate at all.
+            }
+        }
+
+        var key = KeyFactory.NewKey(KeyAlgorithm.ES256);
+
+        try
+        {
+            var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (!string.IsNullOrEmpty(directory))
+            {
+                System.IO.Directory.CreateDirectory(directory);
+            }
+
+            File.WriteAllText(path, SecretProtector.Protect(key.ToPem()));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The certificate can still be issued; only the next renewal pays for it by
+            // registering again.
+        }
+
+        return key;
     }
 
     private static async Task WaitForTxtPropagationAsync(

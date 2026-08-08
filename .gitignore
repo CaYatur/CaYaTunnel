@@ -31,3 +31,6 @@ logs/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+## Local agent scratch snapshots — tooling noise, not project state
+.caya-agent/
