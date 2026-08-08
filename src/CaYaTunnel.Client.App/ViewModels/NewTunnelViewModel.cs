@@ -111,19 +111,19 @@ public sealed class NewTunnelViewModel : ViewModelBase
 
     public bool IsTcp
     {
-        get => Kind == TunnelKind.TcpPort;
+        get => Kind == TunnelKind.PortForward;
         set
         {
             if (value)
             {
-                Kind = TunnelKind.TcpPort;
+                Kind = TunnelKind.PortForward;
             }
         }
     }
 
     public bool IsHostnameKind => Kind is TunnelKind.HttpHost or TunnelKind.TcpHostAware;
 
-    public bool IsPortKind => Kind == TunnelKind.TcpPort;
+    public bool IsPortKind => Kind == TunnelKind.PortForward;
 
     public bool IsHttpKind => Kind == TunnelKind.HttpHost;
 

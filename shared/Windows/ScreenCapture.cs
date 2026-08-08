@@ -4,7 +4,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
-namespace CaYaTunnel.Client.App;
+namespace CaYaTunnel.Ui;
 
 /// <summary>
 /// Renders windows to PNG without a person driving the app.

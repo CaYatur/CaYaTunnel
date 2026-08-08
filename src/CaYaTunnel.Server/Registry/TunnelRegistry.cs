@@ -111,7 +111,7 @@ public sealed class TunnelRegistry
         lock (_gate)
         {
             return _tunnels.Values.FirstOrDefault(t =>
-                t.Kind == TunnelKind.TcpPort && t.Enabled && t.PublicPort == port)?.Clone();
+                t.Kind == TunnelKind.PortForward && t.Enabled && t.PublicPort == port)?.Clone();
         }
     }
 
@@ -266,6 +266,7 @@ public sealed class TunnelRegistry
                 TargetPort = request.TargetPort,
                 Protocol = request.Protocol,
                 TerminateTls = request.TerminateTls,
+                HttpAccess = request.HttpAccess,
                 CreatedByDeviceId = requestingDeviceId,
             };
 
@@ -283,8 +284,11 @@ public sealed class TunnelRegistry
                         : request.Protocol;
                     break;
 
-                case TunnelKind.TcpPort:
+                case TunnelKind.PortForward:
                     tunnel.PublicPort = AllocatePublicPort(request.PublicPort, config);
+                    tunnel.Transports = request.Transports == TransportProtocols.None
+                        ? TransportProtocols.Tcp
+                        : request.Transports;
                     break;
 
                 default:
@@ -295,7 +299,7 @@ public sealed class TunnelRegistry
             {
                 tunnel.Name = tunnel.Hostname is not null
                     ? tunnel.Hostname.Split('.')[0]
-                    : $"tcp-{tunnel.PublicPort}";
+                    : $"port-{tunnel.PublicPort}";
             }
 
             _tunnels[tunnel.Id] = tunnel;
@@ -342,6 +346,21 @@ public sealed class TunnelRegistry
             if (request.Enabled is { } enabled)
             {
                 tunnel.Enabled = enabled;
+            }
+
+            if (request.Transports is { } transports && tunnel.Kind == TunnelKind.PortForward)
+            {
+                if (transports == TransportProtocols.None)
+                {
+                    throw new TunnelValidationException("A port tunnel must carry TCP, UDP, or both.");
+                }
+
+                tunnel.Transports = transports;
+            }
+
+            if (request.HttpAccess is { } access && tunnel.Kind == TunnelKind.HttpHost)
+            {
+                tunnel.HttpAccess = access;
             }
 
             snapshot = tunnel.Clone();
@@ -488,7 +507,7 @@ public sealed class TunnelRegistry
                 throw new TunnelValidationException("That is the control port clients connect on; pick another.");
             }
 
-            if (_tunnels.Values.Any(t => t.Kind == TunnelKind.TcpPort && t.PublicPort == port))
+            if (_tunnels.Values.Any(t => t.Kind == TunnelKind.PortForward && t.PublicPort == port))
             {
                 throw new TunnelValidationException($"Public port {port} is already taken by another tunnel.");
             }
@@ -497,7 +516,7 @@ public sealed class TunnelRegistry
         }
 
         var taken = _tunnels.Values
-            .Where(t => t.Kind == TunnelKind.TcpPort && t.PublicPort.HasValue)
+            .Where(t => t.Kind == TunnelKind.PortForward && t.PublicPort.HasValue)
             .Select(t => t.PublicPort!.Value)
             .ToHashSet();
 

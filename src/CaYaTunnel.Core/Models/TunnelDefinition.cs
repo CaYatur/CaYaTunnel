@@ -32,7 +32,7 @@ public sealed class TunnelDefinition
     public string? Hostname { get; set; }
 
     /// <summary>
-    /// Dedicated public port for <see cref="TunnelKind.TcpPort"/>, or the shared listener port
+    /// Dedicated public port for <see cref="TunnelKind.PortForward"/>, or the shared listener port
     /// for <see cref="TunnelKind.TcpHostAware"/>. Null for <see cref="TunnelKind.HttpHost"/>,
     /// which always rides the shared 80/443.
     /// </summary>
@@ -46,6 +46,22 @@ public sealed class TunnelDefinition
     /// when false it forwards the encrypted bytes untouched (the local service does its own TLS).
     /// </summary>
     public bool TerminateTls { get; set; } = true;
+
+    /// <summary>
+    /// HTTP only. Which of the two public schemes this hostname answers on. The gateway always
+    /// listens on both ports; this decides what each does for this particular tunnel.
+    /// </summary>
+    public HttpAccess HttpAccess { get; set; } = HttpAccess.HttpAndHttps;
+
+    /// <summary>
+    /// <see cref="TunnelKind.PortForward"/> only. Which transports the public port serves.
+    /// Both is common: a game server usually needs TCP and UDP on the same number.
+    /// </summary>
+    public TransportProtocols Transports { get; set; } = TransportProtocols.Tcp;
+
+    public bool ServesTcp => Kind != TunnelKind.PortForward || (Transports & TransportProtocols.Tcp) != 0;
+
+    public bool ServesUdp => Kind == TunnelKind.PortForward && (Transports & TransportProtocols.Udp) != 0;
 
     /// <summary>Disabled tunnels stay in the registry but stop accepting traffic.</summary>
     public bool Enabled { get; set; } = true;
@@ -72,11 +88,24 @@ public sealed class TunnelDefinition
     /// <summary>What a user would paste to reach this tunnel.</summary>
     public string PublicEndpoint(ServerInfo server) => Kind switch
     {
-        TunnelKind.HttpHost => $"https://{Hostname}",
+        TunnelKind.HttpHost => $"{HttpScheme}://{Hostname}",
         TunnelKind.TcpHostAware => $"{Hostname}:{PublicPort ?? 0}",
-        TunnelKind.TcpPort => $"{server.PublicHost}:{PublicPort ?? 0}",
+        TunnelKind.PortForward => $"{server.PublicHost}:{PublicPort ?? 0}",
         _ => "-",
     };
+
+    /// <summary>The scheme to show for an HTTP tunnel — http only when TLS is genuinely off.</summary>
+    public string HttpScheme => HttpAccess == HttpAccess.HttpOnly ? "http" : "https";
+
+    /// <summary>"TCP", "UDP" or "TCP + UDP", for the transports this tunnel actually carries.</summary>
+    public string TransportLabel => Kind != TunnelKind.PortForward
+        ? "TCP"
+        : Transports switch
+        {
+            TransportProtocols.Both => "TCP + UDP",
+            TransportProtocols.Udp => "UDP",
+            _ => "TCP",
+        };
 
     public string TargetEndpoint() => $"{TargetHost}:{TargetPort}";
 

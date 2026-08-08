@@ -281,6 +281,7 @@ public sealed class TunnelClient : IAsyncDisposable
 
             link.ControlHandler = (envelope, ct) => HandleControlAsync(envelope, ct);
             link.TargetDialer = DialTargetAsync;
+            link.DatagramDialer = DialUdpTargetAsync;
             link.ControlHandlerFaulted = (envelope, ex) => Log($"Handling '{envelope.Type}' failed: {ex.Message}");
 
             _link = link;
@@ -425,6 +426,20 @@ public sealed class TunnelClient : IAsyncDisposable
             target.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// Opens a UDP socket towards the target. Unlike TCP there is no connection to fail, so this
+    /// only reports a problem when the address cannot be resolved or the socket cannot be created.
+    /// </summary>
+    private async Task<IDatagramChannel> DialUdpTargetAsync(StreamOpenMessage request, CancellationToken cancellationToken)
+    {
+        var channel = await UdpTargetChannel
+            .ConnectAsync(request.TargetHost, request.TargetPort, cancellationToken)
+            .ConfigureAwait(false);
+
+        Log($"Forwarding UDP from {request.RemoteEndpoint ?? "a visitor"} to {request.TargetHost}:{request.TargetPort}.");
+        return channel;
     }
 
     private Task HandleControlAsync(ControlEnvelope envelope, CancellationToken cancellationToken)

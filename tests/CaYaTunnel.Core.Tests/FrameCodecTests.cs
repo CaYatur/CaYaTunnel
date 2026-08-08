@@ -195,7 +195,7 @@ public class FrameCodecTests
         var request = new CreateTunnelRequest
         {
             Name = "Minecraft",
-            Kind = Core.Models.TunnelKind.TcpPort,
+            Kind = Core.Models.TunnelKind.PortForward,
             TargetHost = "192.168.1.20",
             TargetPort = 25565,
         };
@@ -212,7 +212,7 @@ public class FrameCodecTests
 
         var body = envelope.ReadRequired<CreateTunnelRequest>();
         Assert.Equal("Minecraft", body.Name);
-        Assert.Equal(Core.Models.TunnelKind.TcpPort, body.Kind);
+        Assert.Equal(Core.Models.TunnelKind.PortForward, body.Kind);
         Assert.Equal("192.168.1.20", body.TargetHost);
         Assert.Equal(25565, body.TargetPort);
     }

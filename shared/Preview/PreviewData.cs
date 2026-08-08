@@ -1,7 +1,7 @@
 using CaYaTunnel.Core.Models;
 using CaYaTunnel.Core.Protocol.Messages;
 
-namespace CaYaTunnel.Client.App;
+namespace CaYaTunnel.Ui;
 
 /// <summary>
 /// A plausible registry used to render the UI for screenshots and to eyeball layout without
@@ -94,7 +94,7 @@ public static class PreviewData
             {
                 Id = "t-lan",
                 Name = "Home Assistant",
-                Kind = TunnelKind.TcpPort,
+                Kind = TunnelKind.PortForward,
                 DeviceId = CaganDeviceId,
                 PublicPort = 32001,
                 TargetHost = "192.168.1.20",
@@ -123,7 +123,7 @@ public static class PreviewData
             {
                 Id = "t-off",
                 Name = "Old API",
-                Kind = TunnelKind.TcpPort,
+                Kind = TunnelKind.PortForward,
                 DeviceId = TufDeviceId,
                 PublicPort = 32004,
                 TargetHost = "127.0.0.1",

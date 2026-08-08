@@ -37,28 +37,29 @@ public class GatewayIntegrationTests : IAsyncLifetime
         _dataDirectory = Path.Combine(Path.GetTempPath(), "cayatunnel-tests", Guid.NewGuid().ToString("n"));
         Directory.CreateDirectory(_dataDirectory);
 
+        // The range is picked first so every fixed port can be kept clear of it; the gateway
+        // refuses to start if one of its own listeners sits inside the span it hands out.
+        var rangeStart = TestPorts.RangeStart();
+
         _config = new ServerConfig
         {
             ServerName = "Test Gateway",
-            ControlPort = FreePort(),
+            ControlPort = TestPorts.Free(),
             ControlBindAddress = "127.0.0.1",
             PublicHost = "127.0.0.1",
             BaseDomain = "tunnel.example.test",
             EnableHttpRouter = true,
-            HttpPort = FreePort(),
-            HttpsPort = FreePort(),
+            HttpPort = TestPorts.Free(),
+            HttpsPort = TestPorts.Free(),
             EnableMinecraftRouter = true,
-            MinecraftPort = FreePort(),
+            MinecraftPort = TestPorts.Free(),
             EnrollmentKey = EnrollmentKey.Generate(),
             KeyGeneration = 1,
+            TcpPortRangeStart = rangeStart,
+            TcpPortRangeEnd = rangeStart + TestPorts.RangeSize,
             TlsCertificatePath = Path.Combine(_dataDirectory, "control.pfx"),
             PublicTlsCertificatePath = Path.Combine(_dataDirectory, "public.pfx"),
         };
-
-        // A dedicated range well clear of the ports already handed out above.
-        var rangeStart = FreePort();
-        _config.TcpPortRangeStart = rangeStart;
-        _config.TcpPortRangeEnd = rangeStart + 50;
 
         _registry = new TunnelRegistry(Path.Combine(_dataDirectory, "registry.json"));
 
@@ -168,7 +169,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
         var result = await client.CreateTunnelAsync(new CreateTunnelRequest
         {
             Name = "Minecraft",
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
         });
@@ -308,7 +309,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
         await cagan.CreateTunnelAsync(new CreateTunnelRequest
         {
             Name = "shared-view",
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
         });
@@ -334,7 +335,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
         var created = await cagan.CreateTunnelAsync(new CreateTunnelRequest
         {
             Name = "doomed",
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
         });
@@ -375,7 +376,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
 
         var first = await client.CreateTunnelAsync(new CreateTunnelRequest
         {
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             PublicPort = _config.TcpPortRangeStart,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
@@ -384,7 +385,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
 
         var second = await client.CreateTunnelAsync(new CreateTunnelRequest
         {
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             PublicPort = _config.TcpPortRangeStart,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
@@ -429,7 +430,7 @@ public class GatewayIntegrationTests : IAsyncLifetime
         await client.CreateTunnelAsync(new CreateTunnelRequest
         {
             Name = "counted",
-            Kind = TunnelKind.TcpPort,
+            Kind = TunnelKind.PortForward,
             TargetHost = "127.0.0.1",
             TargetPort = service.Port,
         });
@@ -495,15 +496,6 @@ public class GatewayIntegrationTests : IAsyncLifetime
 
             await Task.Delay(50);
         }
-    }
-
-    private static int FreePort()
-    {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
     }
 
     private static async Task<string> RoundTripAsync(int port, string message)

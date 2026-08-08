@@ -50,6 +50,37 @@ internal sealed class LoopbackChannel : IAsyncDisposable
     }
 }
 
+/// <summary>
+/// Hands out ports for a test gateway. The tunnel range and the fixed ports have to be disjoint:
+/// the server refuses to start if its control port sits inside the range it would allocate
+/// tunnels from, and ephemeral ports are handed out in no particular order.
+/// </summary>
+internal static class TestPorts
+{
+    public const int RangeSize = 50;
+
+    /// <summary>
+    /// A free port from the operating system. On Windows these come from the dynamic range
+    /// (49152+) and are handed out consecutively, which is why the tunnel range below is picked
+    /// from a different band entirely rather than by retrying until the numbers happen to miss.
+    /// </summary>
+    public static int Free()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        listener.Stop();
+        return port;
+    }
+
+    /// <summary>
+    /// Start of a tunnel port range, taken from well below the dynamic range so it can never
+    /// collide with the ephemeral ports the fixed listeners get.
+    /// </summary>
+    public static int RangeStart()
+        => System.Security.Cryptography.RandomNumberGenerator.GetInt32(20000, 29000);
+}
+
 /// <summary>A loopback TCP server that echoes everything back — stands in for a local service.</summary>
 internal sealed class EchoServer : IAsyncDisposable
 {

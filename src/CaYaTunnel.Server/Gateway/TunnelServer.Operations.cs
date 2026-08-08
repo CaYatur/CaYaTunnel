@@ -106,17 +106,31 @@ public sealed partial class TunnelServer
 
     private void OnTunnelAdded(TunnelDefinition tunnel)
     {
-        if (tunnel.Kind == TunnelKind.TcpPort && tunnel.PublicPort is { } port)
+        if (tunnel.Kind == TunnelKind.PortForward)
         {
-            StartPortListener(port);
+            StartPortListener(tunnel);
         }
 
         Broadcast(ControlMessageTypes.TunnelAdded, tunnel);
     }
 
+    /// <summary>
+    /// Rebinds the port when something that affects the listeners changed — being enabled or
+    /// disabled, or switching between TCP and UDP.
+    /// </summary>
+    private void OnTunnelUpdated(TunnelDefinition tunnel)
+    {
+        if (tunnel.Kind == TunnelKind.PortForward)
+        {
+            RestartPortListener(tunnel);
+        }
+
+        Broadcast(ControlMessageTypes.TunnelUpdated, tunnel);
+    }
+
     private void OnTunnelRemoved(TunnelDefinition tunnel)
     {
-        if (tunnel.Kind == TunnelKind.TcpPort && tunnel.PublicPort is { } port)
+        if (tunnel.Kind == TunnelKind.PortForward && tunnel.PublicPort is { } port)
         {
             StopPortListener(port);
         }
@@ -126,9 +140,9 @@ public sealed partial class TunnelServer
 
     private static string Describe(TunnelDefinition tunnel) => tunnel.Kind switch
     {
-        TunnelKind.HttpHost => $"HTTP tunnel {tunnel.Hostname} -> {tunnel.TargetEndpoint()}",
+        TunnelKind.HttpHost => $"{tunnel.HttpScheme} tunnel {tunnel.Hostname} -> {tunnel.TargetEndpoint()}",
         TunnelKind.TcpHostAware => $"{tunnel.Protocol} tunnel {tunnel.Hostname}:{tunnel.PublicPort} -> {tunnel.TargetEndpoint()}",
-        _ => $"TCP tunnel :{tunnel.PublicPort} -> {tunnel.TargetEndpoint()}",
+        _ => $"{tunnel.TransportLabel} tunnel :{tunnel.PublicPort} -> {tunnel.TargetEndpoint()}",
     };
 
     // ---- Devices --------------------------------------------------------------

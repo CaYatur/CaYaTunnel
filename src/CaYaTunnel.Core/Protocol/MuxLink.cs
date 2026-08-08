@@ -59,6 +59,13 @@ public sealed class MuxLink : IAsyncDisposable
     /// </summary>
     public Func<StreamOpenMessage, CancellationToken, Task<Stream>>? TargetDialer { get; set; }
 
+    /// <summary>
+    /// The UDP counterpart of <see cref="TargetDialer"/>, used when the peer opens a stream with
+    /// <see cref="StreamTransports.Udp"/>. Separate because datagrams cannot be pumped as a byte
+    /// stream without losing their boundaries.
+    /// </summary>
+    public Func<StreamOpenMessage, CancellationToken, Task<IDatagramChannel>>? DatagramDialer { get; set; }
+
     /// <summary>Raised once when the read loop ends, with the reason if it was a failure.</summary>
     public Action<Exception?>? Closed { get; set; }
 
@@ -347,47 +354,89 @@ public sealed class MuxLink : IAsyncDisposable
         };
         _streams[streamId] = stream;
 
-        _ = Task.Run(async () =>
-        {
-            var dialer = TargetDialer;
-            if (dialer is null)
-            {
-                await RejectAsync(streamId, "This peer does not accept inbound streams.").ConfigureAwait(false);
-                return;
-            }
-
-            Stream target;
-            try
-            {
-                target = await dialer(request, _shutdown.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                await RejectAsync(streamId, ex.Message).ConfigureAwait(false);
-                return;
-            }
-
-            try
-            {
-                await _writer.WriteJsonAsync(
-                    FrameType.StreamOpenAck,
-                    streamId,
-                    new StreamOpenAckMessage { Ok = true, InitialWindow = ProtocolConstants.InitialStreamWindow },
-                    _shutdown.Token).ConfigureAwait(false);
-
-                await StreamPump.RunAsync(stream, target, _shutdown.Token).ConfigureAwait(false);
-            }
-            catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
-            {
-                // Normal disconnect noise.
-            }
-            finally
-            {
-                await target.DisposeAsync().ConfigureAwait(false);
-                await stream.DisposeAsync().ConfigureAwait(false);
-            }
-        }, CancellationToken.None);
+        _ = Task.Run(() => request.IsUdp
+            ? ServeDatagramStreamAsync(streamId, stream, request)
+            : ServeByteStreamAsync(streamId, stream, request), CancellationToken.None);
     }
+
+    private async Task ServeByteStreamAsync(uint streamId, MuxStream stream, StreamOpenMessage request)
+    {
+        var dialer = TargetDialer;
+        if (dialer is null)
+        {
+            await RejectAsync(streamId, "This peer does not accept inbound streams.").ConfigureAwait(false);
+            return;
+        }
+
+        Stream target;
+        try
+        {
+            target = await dialer(request, _shutdown.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await RejectAsync(streamId, ex.Message).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            await AcceptAsync(streamId).ConfigureAwait(false);
+            await StreamPump.RunAsync(stream, target, _shutdown.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
+        {
+            // Normal disconnect noise.
+        }
+        finally
+        {
+            await target.DisposeAsync().ConfigureAwait(false);
+            await stream.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private async Task ServeDatagramStreamAsync(uint streamId, MuxStream stream, StreamOpenMessage request)
+    {
+        var dialer = DatagramDialer;
+        if (dialer is null)
+        {
+            await RejectAsync(streamId, "This peer does not carry UDP.").ConfigureAwait(false);
+            return;
+        }
+
+        IDatagramChannel channel;
+        try
+        {
+            channel = await dialer(request, _shutdown.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            await RejectAsync(streamId, ex.Message).ConfigureAwait(false);
+            return;
+        }
+
+        try
+        {
+            await AcceptAsync(streamId).ConfigureAwait(false);
+            await DatagramPump.RunAsync(stream, channel, _shutdown.Token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
+        {
+            // Normal disconnect noise.
+        }
+        finally
+        {
+            await channel.DisposeAsync().ConfigureAwait(false);
+            await stream.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
+    private ValueTask AcceptAsync(uint streamId)
+        => _writer.WriteJsonAsync(
+            FrameType.StreamOpenAck,
+            streamId,
+            new StreamOpenAckMessage { Ok = true, InitialWindow = ProtocolConstants.InitialStreamWindow },
+            _shutdown.Token);
 
     private async Task RejectAsync(uint streamId, string error)
     {

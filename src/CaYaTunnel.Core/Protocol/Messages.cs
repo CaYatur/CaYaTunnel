@@ -92,6 +92,18 @@ public sealed class GoAwayMessage
 // Data streams
 // ---------------------------------------------------------------------------
 
+/// <summary>Transport a stream carries. Sent as a string so new ones need no protocol bump.</summary>
+public static class StreamTransports
+{
+    public const string Tcp = "tcp";
+
+    /// <summary>
+    /// The stream carries length-prefixed UDP datagrams rather than a byte stream; see
+    /// <see cref="DatagramFraming"/>.
+    /// </summary>
+    public const string Udp = "udp";
+}
+
 /// <summary>Server -&gt; client: a visitor arrived, please dial this target.</summary>
 public sealed class StreamOpenMessage
 {
@@ -100,6 +112,14 @@ public sealed class StreamOpenMessage
     public string TargetHost { get; set; } = "";
 
     public int TargetPort { get; set; }
+
+    /// <summary>
+    /// <see cref="StreamTransports.Tcp"/> or <see cref="StreamTransports.Udp"/>. Defaults to TCP
+    /// so an older client that ignores the field still behaves correctly.
+    /// </summary>
+    public string Transport { get; set; } = StreamTransports.Tcp;
+
+    public bool IsUdp => string.Equals(Transport, StreamTransports.Udp, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Where the visitor came from, for logs and the live connection list.</summary>
     public string? RemoteEndpoint { get; set; }
@@ -226,6 +246,12 @@ public sealed class CreateTunnelRequest
     public string? Protocol { get; set; }
 
     public bool TerminateTls { get; set; } = true;
+
+    /// <summary>HTTP tunnels only: which public schemes the hostname answers on.</summary>
+    public HttpAccess HttpAccess { get; set; } = HttpAccess.HttpAndHttps;
+
+    /// <summary>Port tunnels only: TCP, UDP, or both on the same public port.</summary>
+    public TransportProtocols Transports { get; set; } = TransportProtocols.Tcp;
 }
 
 public sealed class UpdateTunnelRequest
@@ -239,6 +265,11 @@ public sealed class UpdateTunnelRequest
     public int? TargetPort { get; set; }
 
     public bool? Enabled { get; set; }
+
+    /// <summary>Changing this rebinds the public port, so it can be switched after creation.</summary>
+    public TransportProtocols? Transports { get; set; }
+
+    public HttpAccess? HttpAccess { get; set; }
 }
 
 public sealed class TunnelIdRequest

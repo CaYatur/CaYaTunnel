@@ -37,7 +37,7 @@ public sealed partial class TunnelServer : IAsyncDisposable
         Log = log ?? throw new ArgumentNullException(nameof(log));
 
         Registry.TunnelAdded += tunnel => OnTunnelAdded(tunnel);
-        Registry.TunnelUpdated += tunnel => Broadcast(ControlMessageTypes.TunnelUpdated, tunnel);
+        Registry.TunnelUpdated += tunnel => OnTunnelUpdated(tunnel);
         Registry.TunnelRemoved += tunnel => OnTunnelRemoved(tunnel);
         Registry.DeviceUpdated += device => Broadcast(ControlMessageTypes.DeviceUpdated, device);
         Registry.DeviceRemoved += device => Broadcast(ControlMessageTypes.DeviceRemoved, device);
@@ -498,6 +498,23 @@ public sealed partial class TunnelServer : IAsyncDisposable
         }
 
         StateChanged?.Invoke();
+    }
+
+    /// <summary>Records a new connection or UDP flow and pushes the updated counters out.</summary>
+    internal void OnTunnelConnectionOpened(string tunnelId)
+    {
+        if (Registry.RecordTraffic(tunnelId, 0, 0, activeDelta: 1) is { } tunnel)
+        {
+            Broadcast(ControlMessageTypes.TunnelStats, tunnel);
+        }
+    }
+
+    internal void OnTunnelConnectionClosed(string tunnelId, long bytesIn, long bytesOut)
+    {
+        if (Registry.RecordTraffic(tunnelId, bytesIn, bytesOut, activeDelta: -1) is { } tunnel)
+        {
+            Broadcast(ControlMessageTypes.TunnelStats, tunnel);
+        }
     }
 
     private void Notify(string deviceId, NoticeMessage notice)

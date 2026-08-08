@@ -47,7 +47,8 @@ public sealed class DeviceSession : IAsyncDisposable
     public Task<MuxStream> OpenStreamAsync(
         TunnelDefinition tunnel,
         string? remoteEndpoint,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string transport = StreamTransports.Tcp)
         => _link.OpenStreamAsync(
             new StreamOpenMessage
             {
@@ -55,6 +56,7 @@ public sealed class DeviceSession : IAsyncDisposable
                 TargetHost = tunnel.TargetHost,
                 TargetPort = tunnel.TargetPort,
                 RemoteEndpoint = remoteEndpoint,
+                Transport = transport,
             },
             cancellationToken);
 

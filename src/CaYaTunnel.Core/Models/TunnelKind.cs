@@ -22,11 +22,46 @@ public enum TunnelKind
     TcpHostAware,
 
     /// <summary>
-    /// Plain TCP. The protocol carries no hostname, so the tunnel owns a dedicated public
-    /// port and routing is purely port -&gt; device -&gt; target.
+    /// A dedicated public port carrying TCP, UDP or both. Most protocols announce no hostname,
+    /// so the port itself is the whole routing decision.
     /// e.g. 203.0.113.10:32001 -> CAGAN-PC -> 127.0.0.1:25565
     /// </summary>
-    TcpPort,
+    PortForward,
+}
+
+/// <summary>
+/// Which transports a <see cref="TunnelKind.PortForward"/> tunnel serves on its public port.
+/// <para>
+/// Both at once is the common case for game servers, which typically listen on the same port
+/// number for TCP and UDP and need both to work.
+/// </para>
+/// </summary>
+[Flags]
+public enum TransportProtocols
+{
+    None = 0,
+    Tcp = 1,
+    Udp = 2,
+    Both = Tcp | Udp,
+}
+
+/// <summary>
+/// Which public schemes an <see cref="TunnelKind.HttpHost"/> tunnel answers on. The gateway
+/// listens on both 80 and 443 for everyone; this decides what a given hostname does with each.
+/// </summary>
+public enum HttpAccess
+{
+    /// <summary>Serve the tunnel on both http:// and https://.</summary>
+    HttpAndHttps,
+
+    /// <summary>Answer only on https://; plain HTTP is refused.</summary>
+    HttpsOnly,
+
+    /// <summary>Answer only on http://. Useful for a service that must not be behind TLS.</summary>
+    HttpOnly,
+
+    /// <summary>Answer on https://, and send plain HTTP a permanent redirect to it.</summary>
+    RedirectToHttps,
 }
 
 /// <summary>

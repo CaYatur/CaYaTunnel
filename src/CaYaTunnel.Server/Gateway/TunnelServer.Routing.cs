@@ -48,10 +48,10 @@ public sealed partial class TunnelServer
                 RouteHostAwareTcpAsync, token));
         }
 
-        // One listener per dedicated-port tunnel that already exists.
-        foreach (var tunnel in Registry.Tunnels.Where(t => t.Kind == TunnelKind.TcpPort && t.PublicPort.HasValue))
+        // One listener set per dedicated-port tunnel that already exists.
+        foreach (var tunnel in Registry.Tunnels.Where(t => t.Kind == TunnelKind.PortForward && t.PublicPort.HasValue))
         {
-            StartPortListener(tunnel.PublicPort!.Value);
+            StartPortListener(tunnel);
         }
     }
 
@@ -68,11 +68,20 @@ public sealed partial class TunnelServer
         _publicShutdown = null;
     }
 
-    // ---- Dedicated TCP ports -------------------------------------------------
+    // ---- Dedicated ports (TCP, UDP, or both) ----------------------------------
 
-    private void StartPortListener(int port)
+    /// <summary>
+    /// Binds whichever transports the tunnel asked for on its public port. A game server usually
+    /// wants both on the same number, so they are managed together rather than as two tunnels.
+    /// </summary>
+    private void StartPortListener(TunnelDefinition tunnel)
     {
-        if (_publicShutdown is null || _portListeners.ContainsKey(port))
+        if (_publicShutdown is null || tunnel.PublicPort is not { } port)
+        {
+            return;
+        }
+
+        if (_portListeners.ContainsKey(port))
         {
             return;
         }
@@ -84,9 +93,19 @@ public sealed partial class TunnelServer
             return;
         }
 
-        listener.Task = RunListenerAsync(port, $"tcp:{port}",
-            (stream, remote, ct) => RouteDedicatedPortAsync(port, stream, remote, ct),
-            listener.Token);
+        if (tunnel.ServesTcp)
+        {
+            listener.TcpTask = RunListenerAsync(port, $"tcp:{port}",
+                (stream, remote, ct) => RouteDedicatedPortAsync(port, stream, remote, ct),
+                listener.Token);
+        }
+
+        if (tunnel.ServesUdp)
+        {
+            var udp = new UdpPortRouter(port, this, Log);
+            udp.Start(listener.Token);
+            listener.Udp = udp;
+        }
     }
 
     private void StopPortListener(int port)
@@ -94,7 +113,23 @@ public sealed partial class TunnelServer
         if (_portListeners.TryRemove(port, out var listener))
         {
             listener.Dispose();
-            Log.Info("gateway", $"Stopped listening on TCP {port}.");
+            Log.Info("gateway", $"Stopped listening on port {port}.");
+        }
+    }
+
+    /// <summary>Rebinds a port after its transports changed.</summary>
+    private void RestartPortListener(TunnelDefinition tunnel)
+    {
+        if (tunnel.PublicPort is not { } port)
+        {
+            return;
+        }
+
+        StopPortListener(port);
+
+        if (tunnel.Enabled)
+        {
+            StartPortListener(tunnel);
         }
     }
 
@@ -106,11 +141,18 @@ public sealed partial class TunnelServer
 
         public CancellationToken Token => _cts.Token;
 
-        public Task? Task { get; set; }
+        public Task? TcpTask { get; set; }
+
+        public UdpPortRouter? Udp { get; set; }
 
         public void Dispose()
         {
             _cts.Cancel();
+
+            // Closed synchronously so the port is actually free before anything tries to rebind
+            // it; the router's own loops finish unwinding in the background.
+            Udp?.Close();
+
             _cts.Dispose();
         }
     }
@@ -223,6 +265,15 @@ public sealed partial class TunnelServer
                 return;
             }
 
+            if (sniTunnel.HttpAccess == HttpAccess.HttpOnly)
+            {
+                // The operator asked for plain HTTP only. Completing the TLS handshake just to
+                // refuse would be worse: the browser would show a certificate the site never
+                // meant to present.
+                Log.Debug("https", $"'{sniTunnel.Name}' is configured for plain HTTP only.");
+                return;
+            }
+
             if (!sniTunnel.TerminateTls)
             {
                 // Passthrough: the service behind the tunnel speaks TLS itself, so the encrypted
@@ -285,7 +336,41 @@ public sealed partial class TunnelServer
             return;
         }
 
+        switch (tunnel.HttpAccess)
+        {
+            case HttpAccess.HttpsOnly:
+                await WriteHttpErrorAsync(stream, 403,
+                    "This tunnel is available over HTTPS only.", cancellationToken).ConfigureAwait(false);
+                return;
+
+            case HttpAccess.RedirectToHttps:
+                await WriteRedirectAsync(stream, $"https://{hostname}", ProtocolSniffers.ReadHttpTarget(head),
+                    cancellationToken).ConfigureAwait(false);
+                return;
+        }
+
         await ForwardAsync(tunnel, stream, remote, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Sends a permanent redirect, preserving the path and query the visitor asked for.</summary>
+    private static async Task WriteRedirectAsync(Stream stream, string origin, string? target, CancellationToken cancellationToken)
+    {
+        var location = origin + (string.IsNullOrEmpty(target) ? "/" : target);
+
+        var response = "HTTP/1.1 301 Moved Permanently\r\n"
+            + $"Location: {location}\r\n"
+            + "Content-Length: 0\r\n"
+            + "Connection: close\r\n\r\n";
+
+        try
+        {
+            await stream.WriteAsync(Encoding.ASCII.GetBytes(response), cancellationToken).ConfigureAwait(false);
+            await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or OperationCanceledException)
+        {
+            // Visitor gave up first.
+        }
     }
 
     /// <summary>
@@ -297,6 +382,7 @@ public sealed partial class TunnelServer
         var reason = status switch
         {
             400 => "Bad Request",
+            403 => "Forbidden",
             404 => "Not Found",
             502 => "Bad Gateway",
             503 => "Service Unavailable",

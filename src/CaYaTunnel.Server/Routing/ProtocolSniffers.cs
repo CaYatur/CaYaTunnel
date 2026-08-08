@@ -9,7 +9,7 @@ namespace CaYaTunnel.Server.Routing;
 /// This is what lets many tunnels share one public port. It only works for protocols that
 /// announce where they are going — TLS via SNI, HTTP via the Host header, Minecraft Java via its
 /// handshake packet. Plain TCP carries no such field, which is exactly why
-/// <see cref="Core.Models.TunnelKind.TcpPort"/> exists and gets a port of its own.
+/// <see cref="Core.Models.TunnelKind.PortForward"/> exists and gets a port of its own.
 /// </para>
 /// </summary>
 public static class ProtocolSniffers
@@ -162,6 +162,32 @@ public static class ProtocolSniffers
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// Reads the request target (path and query) from the request line, so a redirect can send
+    /// the visitor to the page they actually asked for rather than dumping them on the root.
+    /// </summary>
+    public static string? ReadHttpTarget(ReadOnlySpan<byte> data)
+    {
+        var text = Encoding.ASCII.GetString(data);
+        var lineEnd = text.IndexOf('\n');
+        if (lineEnd < 0)
+        {
+            return null;
+        }
+
+        var parts = text[..lineEnd].TrimEnd('\r').Split(' ');
+        if (parts.Length < 2)
+        {
+            return null;
+        }
+
+        var target = parts[1];
+
+        // Only origin-form targets are safe to append; an absolute-form request line would
+        // otherwise let a visitor steer the redirect at another host.
+        return target.StartsWith('/') ? target : "/";
     }
 
     /// <summary>
