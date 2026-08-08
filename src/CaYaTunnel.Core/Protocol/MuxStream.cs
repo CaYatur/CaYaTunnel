@@ -8,7 +8,7 @@ namespace CaYaTunnel.Core.Protocol;
 /// can be handed straight to <see cref="Stream.CopyToAsync(Stream, CancellationToken)"/> against
 /// a real socket.
 /// </summary>
-public sealed class MuxStream : Stream
+public sealed class MuxStream : Stream, IHalfClosable
 {
     private readonly MuxLink _link;
     private readonly Pipe _inbound;

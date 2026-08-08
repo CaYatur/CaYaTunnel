@@ -94,15 +94,19 @@ public static class StreamPump
     /// <summary>
     /// Tells the destination that this direction is done without killing the other one, so a
     /// peer waiting on the response half still gets it.
+    /// <para>
+    /// Public because wrappers (a stream replaying peeked bytes, a TLS-terminating stream) need
+    /// to pass the signal down to whatever they wrap.
+    /// </para>
     /// </summary>
-    private static async ValueTask HalfCloseAsync(Stream destination)
+    public static async ValueTask HalfCloseAsync(Stream destination)
     {
         try
         {
             switch (destination)
             {
-                case MuxStream mux:
-                    await mux.CompleteWriteAsync().ConfigureAwait(false);
+                case IHalfClosable halfClosable:
+                    await halfClosable.CompleteWriteAsync().ConfigureAwait(false);
                     break;
 
                 case NetworkStream { Socket.Connected: true } network:

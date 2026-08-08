@@ -1,0 +1,215 @@
+using CaYaTunnel.Core.Models;
+
+namespace CaYaTunnel.Server.Configuration;
+
+/// <summary>
+/// Everything an operator can change about a deployment. No domain, host, port or provider is
+/// baked into the source — someone cloning this repo configures their own here and never edits
+/// code. Secrets in this object are encrypted at rest by <see cref="ServerConfigStore"/>.
+/// </summary>
+public sealed class ServerConfig
+{
+    /// <summary>Display name for this deployment, shown in both UIs.</summary>
+    public string ServerName { get; set; } = "CaYaTunnel Server";
+
+    // ---- Control channel (the port you forward to this machine) -----------
+
+    /// <summary>
+    /// Port clients dial. Deliberately outside the well-known ranges so it does not collide
+    /// with anything standard and attracts less scanner noise.
+    /// </summary>
+    public int ControlPort { get; set; } = 48771;
+
+    /// <summary>Interface the control listener binds to. "0.0.0.0" means every interface.</summary>
+    public string ControlBindAddress { get; set; } = "0.0.0.0";
+
+    // ---- Public identity --------------------------------------------------
+
+    /// <summary>
+    /// Address users connect to for port-based tunnels — the public IP, or a hostname that
+    /// resolves to it. Also what the client shows as the endpoint to copy.
+    /// </summary>
+    public string PublicHost { get; set; } = "";
+
+    /// <summary>
+    /// Zone that hostname tunnels are created under, e.g. "tunnel.example.com". Leave empty for
+    /// an IP-and-port-only deployment; the UI then hides hostname tunnels instead of failing.
+    /// </summary>
+    public string BaseDomain { get; set; } = "";
+
+    // ---- Public listeners --------------------------------------------------
+
+    public bool EnableHttpRouter { get; set; } = true;
+
+    public int HttpPort { get; set; } = 80;
+
+    public int HttpsPort { get; set; } = 443;
+
+    /// <summary>Shared listener for host-aware TCP tunnels (Minecraft Java).</summary>
+    public bool EnableMinecraftRouter { get; set; } = true;
+
+    public int MinecraftPort { get; set; } = 25565;
+
+    /// <summary>Range dedicated TCP tunnels are allocated from when no port is given.</summary>
+    public int TcpPortRangeStart { get; set; } = 32000;
+
+    public int TcpPortRangeEnd { get; set; } = 32999;
+
+    // ---- Authentication ----------------------------------------------------
+
+    /// <summary>
+    /// Secret embedded in provisioned clients. Regenerating it locks out every existing build —
+    /// that is the intended kill switch, not a side effect.
+    /// </summary>
+    public string EnrollmentKey { get; set; } = "";
+
+    /// <summary>Bumped on every rotation so a stale client gets "key rotated", not "bad key".</summary>
+    public int KeyGeneration { get; set; } = 1;
+
+    /// <summary>
+    /// Keys retired by a rotation. Kept only so an old client can be told precisely why it was
+    /// refused; they never grant access.
+    /// </summary>
+    public List<RetiredKey> RetiredKeys { get; set; } = [];
+
+    /// <summary>When true a newly seen device is held until an operator approves it.</summary>
+    public bool RequireManualApproval { get; set; }
+
+    // ---- TLS ----------------------------------------------------------------
+
+    /// <summary>
+    /// Optional PFX for the control listener. Empty means the server generates and persists a
+    /// self-signed certificate, which is fine because clients pin its fingerprint rather than
+    /// trusting a CA.
+    /// </summary>
+    public string TlsCertificatePath { get; set; } = "";
+
+    public string TlsCertificatePassword { get; set; } = "";
+
+    /// <summary>
+    /// Optional PFX used to terminate public HTTPS. Without one the gateway still serves HTTPS
+    /// with its self-signed certificate, which works behind Cloudflare's "Full" mode.
+    /// </summary>
+    public string PublicTlsCertificatePath { get; set; } = "";
+
+    public string PublicTlsCertificatePassword { get; set; } = "";
+
+    // ---- DNS ----------------------------------------------------------------
+
+    public DnsSettings Dns { get; set; } = new();
+
+    // ---- Housekeeping --------------------------------------------------------
+
+    /// <summary>Start the gateway automatically when the admin app launches.</summary>
+    public bool AutoStartGateway { get; set; } = true;
+
+    /// <summary>Launch the admin app at Windows sign-in.</summary>
+    public bool StartWithWindows { get; set; }
+
+    /// <summary>Start minimised to the tray when launched at sign-in.</summary>
+    public bool StartMinimised { get; set; }
+
+    public ServerInfo ToServerInfo(bool dnsAutomationEnabled) => new()
+    {
+        ServerName = ServerName,
+        PublicHost = PublicHost,
+        BaseDomain = BaseDomain,
+        HttpPort = HttpPort,
+        HttpsPort = HttpsPort,
+        MinecraftPort = MinecraftPort,
+        TcpPortRangeStart = TcpPortRangeStart,
+        TcpPortRangeEnd = TcpPortRangeEnd,
+        DnsAutomationEnabled = dnsAutomationEnabled,
+        Features = ["http-router", "minecraft-router", "tcp-ports", "realtime-events", "client-provisioning"],
+    };
+
+    /// <summary>Problems that would stop the gateway from starting, in operator language.</summary>
+    public IReadOnlyList<string> Validate()
+    {
+        var problems = new List<string>();
+
+        if (ControlPort is < 1 or > 65535)
+        {
+            problems.Add("Control port must be between 1 and 65535.");
+        }
+
+        if (string.IsNullOrWhiteSpace(EnrollmentKey))
+        {
+            problems.Add("No enrollment key has been generated yet.");
+        }
+
+        if (TcpPortRangeStart is < 1 or > 65535 || TcpPortRangeEnd is < 1 or > 65535)
+        {
+            problems.Add("TCP port range must fall between 1 and 65535.");
+        }
+        else if (TcpPortRangeEnd < TcpPortRangeStart)
+        {
+            problems.Add("TCP port range ends before it starts.");
+        }
+
+        if (ControlPort >= TcpPortRangeStart && ControlPort <= TcpPortRangeEnd)
+        {
+            problems.Add("The control port falls inside the TCP tunnel range and would be handed out to a tunnel.");
+        }
+
+        if (string.IsNullOrWhiteSpace(PublicHost))
+        {
+            problems.Add("Public host is empty, so port-based tunnels have no address to show users.");
+        }
+
+        if (Dns.Provider == DnsProviderKind.Cloudflare)
+        {
+            if (string.IsNullOrWhiteSpace(Dns.CloudflareApiToken))
+            {
+                problems.Add("Cloudflare is selected but no API token is set.");
+            }
+
+            if (string.IsNullOrWhiteSpace(Dns.CloudflareZoneId))
+            {
+                problems.Add("Cloudflare is selected but no zone id is set.");
+            }
+
+            if (string.IsNullOrWhiteSpace(BaseDomain))
+            {
+                problems.Add("Cloudflare is selected but no base domain is set, so there is nothing to create records under.");
+            }
+        }
+
+        return problems;
+    }
+}
+
+/// <summary>A key removed by rotation, kept for diagnostics only.</summary>
+public sealed class RetiredKey
+{
+    public int Generation { get; set; }
+
+    public string Hash { get; set; } = "";
+
+    public string Salt { get; set; } = "";
+
+    public DateTimeOffset RetiredAt { get; set; } = DateTimeOffset.UtcNow;
+}
+
+public enum DnsProviderKind
+{
+    /// <summary>Operator manages DNS by hand — typically one wildcard record.</summary>
+    None,
+
+    Cloudflare,
+}
+
+public sealed class DnsSettings
+{
+    public DnsProviderKind Provider { get; set; } = DnsProviderKind.None;
+
+    public string CloudflareApiToken { get; set; } = "";
+
+    public string CloudflareZoneId { get; set; } = "";
+
+    /// <summary>Route records through Cloudflare's proxy (the orange cloud).</summary>
+    public bool ProxyRecords { get; set; } = true;
+
+    /// <summary>1 means "automatic" to Cloudflare.</summary>
+    public int RecordTtl { get; set; } = 1;
+}

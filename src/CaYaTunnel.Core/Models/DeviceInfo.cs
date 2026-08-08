@@ -16,6 +16,12 @@ public sealed class DeviceInfo
     /// <summary>Revoked devices are kept for the audit trail but can never authenticate again.</summary>
     public bool Revoked { get; set; }
 
+    /// <summary>
+    /// False only while a device waits for an operator to approve it, which happens when the
+    /// server is configured to require manual approval for newly seen machines.
+    /// </summary>
+    public bool Approved { get; set; } = true;
+
     /// <summary>Public address the client connected from, as seen by the server.</summary>
     public string? RemoteAddress { get; set; }
 
