@@ -92,6 +92,22 @@ self-contained, so no runtime install is needed.
    (80/443 for websites, 25565 for Minecraft, and the TCP/UDP tunnel range).
 4. Press **Start gateway**.
 
+### Automatic HTTPS certificates
+
+For public website tunnels, CaYaTunnel can obtain and renew a browser-trusted wildcard certificate automatically. Under **Settings → Public HTTPS certificate**, enable **Automatic Let's Encrypt certificate**, enter a Let's Encrypt contact e-mail, and configure Cloudflare DNS automation.
+
+Automatic HTTPS uses the **DNS-01** challenge, so certificate validation does **not** require ports 80 or 443. CaYaTunnel creates the temporary `_acme-challenge` TXT record through the Cloudflare API, waits until the exact TXT value is publicly visible, asks Let's Encrypt to validate it, and then removes the challenge record. Certificates are renewed automatically before expiry.
+
+For Cloudflare, provide an API token with **Zone → DNS → Edit**. Adding **Zone → Zone → Read** lets CaYaTunnel discover the correct Zone ID automatically from the configured base domain; you can still enter the Zone ID manually when using a DNS-edit-only token.
+
+When automatic Let's Encrypt mode is enabled, website DNS records are kept **DNS only** instead of Cloudflare-proxied so visitors can connect directly to the certificate served by CaYaTunnel.
+
+### Optional ports-free HTTPS on 443
+
+CaYaTunnel does not claim port 443 by default. The normal single/shared port, such as `48771`, continues to serve HTTPS as before, so an existing service on 443 is left untouched.
+
+If port 443 is free and you want clean URLs such as `https://panel.tunnel.example.com` without `:48771`, enable **Also serve ports-free HTTPS on 443**. CaYaTunnel then adds an HTTPS listener on 443 while keeping the normal shared/control port active. Leave this option off when another application already owns 443.
+
 ![Gateway](docs/images/server-overview.png)
 
 ### 2. A client build
