@@ -43,6 +43,14 @@ public class SinglePortModeTests : IAsyncLifetime
             PublicHost = "127.0.0.1",
             BaseDomain = "tunnel.example.test",
             EnrollmentKey = EnrollmentKey.Generate(),
+
+            // Given real free ports rather than the 80/443/25565 defaults. The test asserts the
+            // gateway does not bind these, and on a build agent something else is often already
+            // listening on 80 — which would fail the assertion for a reason that has nothing to
+            // do with what is being tested.
+            HttpPort = TestPorts.Free(),
+            HttpsPort = TestPorts.Free(),
+            MinecraftPort = TestPorts.Free(),
             TcpPortRangeStart = rangeStart,
             TcpPortRangeEnd = rangeStart + TestPorts.RangeSize,
             TlsCertificatePath = Path.Combine(_dataDirectory, "control.pfx"),
