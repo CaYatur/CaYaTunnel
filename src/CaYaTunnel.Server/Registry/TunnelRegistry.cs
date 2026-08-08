@@ -267,6 +267,7 @@ public sealed class TunnelRegistry
                 Protocol = request.Protocol,
                 TerminateTls = request.TerminateTls,
                 HttpAccess = request.HttpAccess,
+                RewriteHostHeader = request.RewriteHostHeader,
                 CreatedByDeviceId = requestingDeviceId,
             };
 
@@ -374,6 +375,11 @@ public sealed class TunnelRegistry
             if (request.HttpAccess is { } access && tunnel.Kind == TunnelKind.HttpHost)
             {
                 tunnel.HttpAccess = access;
+            }
+
+            if (request.RewriteHostHeader is { } rewrite && tunnel.Kind == TunnelKind.HttpHost)
+            {
+                tunnel.RewriteHostHeader = rewrite;
             }
 
             snapshot = tunnel.Clone();

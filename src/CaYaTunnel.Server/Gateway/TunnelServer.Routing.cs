@@ -659,6 +659,13 @@ public sealed partial class TunnelServer
             return;
         }
 
+        // Only possible where the gateway sees plaintext: a passthrough TLS tunnel is encrypted
+        // end to end and there is no header here to change.
+        if (tunnel.RewriteHostHeader && tunnel.Kind == TunnelKind.HttpHost && tunnel.TerminateTls)
+        {
+            visitor = new HostRewritingStream(visitor, tunnel.TargetEndpoint());
+        }
+
         MuxStream mux;
         try
         {

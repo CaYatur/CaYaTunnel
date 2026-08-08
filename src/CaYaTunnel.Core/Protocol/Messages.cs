@@ -250,6 +250,9 @@ public sealed class CreateTunnelRequest
     /// <summary>HTTP tunnels only: which public schemes the hostname answers on.</summary>
     public HttpAccess HttpAccess { get; set; } = HttpAccess.HttpAndHttps;
 
+    /// <summary>HTTP tunnels only: present the target's own address as the Host header.</summary>
+    public bool RewriteHostHeader { get; set; }
+
     /// <summary>Port tunnels only: TCP, UDP, or both on the same public port.</summary>
     public TransportProtocols Transports { get; set; } = TransportProtocols.Tcp;
 
@@ -276,6 +279,8 @@ public sealed class UpdateTunnelRequest
     public TransportProtocols? Transports { get; set; }
 
     public HttpAccess? HttpAccess { get; set; }
+
+    public bool? RewriteHostHeader { get; set; }
 }
 
 public sealed class TunnelIdRequest

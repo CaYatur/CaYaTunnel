@@ -26,6 +26,7 @@ public sealed class NewTunnelViewModel : ViewModelBase
     private int _transportIndex;
     private int _httpAccessIndex;
     private bool _useSharedPort;
+    private bool _rewriteHostHeader;
 
     public NewTunnelViewModel(ShellViewModel shell)
     {
@@ -252,6 +253,13 @@ public sealed class NewTunnelViewModel : ViewModelBase
         set => Set(ref _terminateTls, value);
     }
 
+    /// <summary>Present the target's own address as the Host header; see the tunnel model.</summary>
+    public bool RewriteHostHeader
+    {
+        get => _rewriteHostHeader;
+        set => Set(ref _rewriteHostHeader, value);
+    }
+
     public string? Error
     {
         get => _error;
@@ -299,6 +307,7 @@ public sealed class NewTunnelViewModel : ViewModelBase
             Protocol = Kind == TunnelKind.TcpHostAware ? HostAwareProtocols.MinecraftJava : null,
             TerminateTls = TerminateTls,
             HttpAccess = HttpAccess,
+            RewriteHostHeader = IsHttpKind && RewriteHostHeader,
             Transports = Transports,
             UseSharedPort = IsPortKind && UseSharedPort,
         });

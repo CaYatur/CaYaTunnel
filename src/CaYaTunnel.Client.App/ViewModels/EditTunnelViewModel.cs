@@ -24,6 +24,7 @@ public sealed class EditTunnelViewModel : ViewModelBase
     private bool _enabled;
     private int _transportIndex;
     private int _httpAccessIndex;
+    private bool _rewriteHostHeader;
     private string? _error;
 
     public EditTunnelViewModel(ShellViewModel shell, TunnelRow row)
@@ -36,6 +37,7 @@ public sealed class EditTunnelViewModel : ViewModelBase
         _targetHost = tunnel.TargetHost;
         _targetPort = tunnel.TargetPort.ToString();
         _enabled = tunnel.Enabled;
+        _rewriteHostHeader = tunnel.RewriteHostHeader;
 
         _transportIndex = tunnel.Transports switch
         {
@@ -140,6 +142,12 @@ public sealed class EditTunnelViewModel : ViewModelBase
         set => Set(ref _httpAccessIndex, value);
     }
 
+    public bool RewriteHostHeader
+    {
+        get => _rewriteHostHeader;
+        set => Set(ref _rewriteHostHeader, value);
+    }
+
     public string? Error
     {
         get => _error;
@@ -191,6 +199,8 @@ public sealed class EditTunnelViewModel : ViewModelBase
                 3 => HttpAccess.RedirectToHttps,
                 _ => HttpAccess.HttpAndHttps,
             };
+
+            request.RewriteHostHeader = RewriteHostHeader;
         }
 
         var result = await _shell.UpdateTunnelAsync(request);

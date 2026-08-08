@@ -302,6 +302,39 @@ public class SinglePortModeTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_service_that_only_trusts_localhost_works_once_the_host_header_is_rewritten()
+    {
+        // The shape of a real local-only tool: it refuses any Host that is not localhost, which
+        // is how such tools defend against DNS rebinding. Without rewriting, tunnelled requests
+        // get a 400 that says nothing about the cause.
+        await using var strict = HostCheckingServer.Start();
+
+        var created = await _client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Kind = TunnelKind.HttpHost,
+            Subdomain = "strict",
+            TargetHost = "127.0.0.1",
+            TargetPort = strict.Port,
+        });
+        Assert.True(created.Ok, created.Error);
+
+        var refused = await HttpGetAsync(_config.ControlPort, "strict.tunnel.example.test");
+        Assert.Contains("400", refused);
+
+        var tunnel = _registry.Tunnels.Single(t => t.Hostname!.StartsWith("strict."));
+        var updated = await _client.UpdateTunnelAsync(new UpdateTunnelRequest
+        {
+            TunnelId = tunnel.Id,
+            RewriteHostHeader = true,
+        });
+        Assert.True(updated.Ok, updated.Error);
+
+        var accepted = await HttpGetAsync(_config.ControlPort, "strict.tunnel.example.test");
+        Assert.Contains("200", accepted);
+        Assert.Contains("only-localhost", accepted);
+    }
+
+    [Fact]
     public void Only_the_shared_port_is_reserved()
     {
         Assert.Single(_config.ReservedPorts());
@@ -319,6 +352,99 @@ public class SinglePortModeTests : IAsyncLifetime
         catch (Exception ex) when (ex is SocketException or TimeoutException or OperationCanceledException)
         {
             return false;
+        }
+    }
+
+    /// <summary>
+    /// Stands in for a local-only tool: answers 200 for a localhost Host header and 400 for
+    /// anything else, which is what ActivityWatch and friends do to block DNS rebinding.
+    /// </summary>
+    private sealed class HostCheckingServer : IAsyncDisposable
+    {
+        private readonly TcpListener _listener;
+        private readonly CancellationTokenSource _cts = new();
+        private readonly Task _loop;
+
+        private HostCheckingServer(TcpListener listener)
+        {
+            _listener = listener;
+            Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            _loop = AcceptAsync(_cts.Token);
+        }
+
+        public int Port { get; }
+
+        public static HostCheckingServer Start()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            return new HostCheckingServer(listener);
+        }
+
+        private async Task AcceptAsync(CancellationToken cancellationToken)
+        {
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var client = await _listener.AcceptTcpClientAsync(cancellationToken);
+                    _ = Task.Run(async () =>
+                    {
+                        using (client)
+                        {
+                            try
+                            {
+                                var stream = client.GetStream();
+                                var buffer = new byte[4096];
+                                var read = await stream.ReadAsync(buffer, cancellationToken);
+                                var request = Encoding.ASCII.GetString(buffer, 0, read);
+
+                                var host = request.Split("\r\n")
+                                    .FirstOrDefault(l => l.StartsWith("Host:", StringComparison.OrdinalIgnoreCase))
+                                    ?.Split(':', 2)[1].Trim() ?? "";
+
+                                var trusted = host.StartsWith("127.0.0.1", StringComparison.Ordinal)
+                                    || host.StartsWith("localhost", StringComparison.OrdinalIgnoreCase);
+
+                                var body = trusted ? "only-localhost" : "bad host";
+                                var response = $"HTTP/1.1 {(trusted ? "200 OK" : "400 BAD REQUEST")}\r\n"
+                                    + "Content-Type: text/plain\r\n"
+                                    + $"Content-Length: {body.Length}\r\n"
+                                    + "Connection: close\r\n\r\n" + body;
+
+                                await stream.WriteAsync(Encoding.ASCII.GetBytes(response), cancellationToken);
+                                await stream.FlushAsync(cancellationToken);
+                                client.Client.Shutdown(SocketShutdown.Send);
+                            }
+                            catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException)
+                            {
+                                // Visitor left.
+                            }
+                        }
+                    }, CancellationToken.None);
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or SocketException or ObjectDisposedException)
+            {
+                // Shutting down.
+            }
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await _cts.CancelAsync();
+            _listener.Stop();
+
+            try
+            {
+                await _loop;
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected.
+            }
+
+            _cts.Dispose();
         }
     }
 

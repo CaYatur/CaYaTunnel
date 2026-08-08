@@ -48,6 +48,17 @@ public sealed class TunnelDefinition
     public bool TerminateTls { get; set; } = true;
 
     /// <summary>
+    /// HTTP only. Replace the Host header with the target's own address before forwarding.
+    /// <para>
+    /// Services that only expect to be reached on localhost often check this header and refuse
+    /// anything else — it is how they defend against DNS rebinding. They answer normally once
+    /// they see the address they expect. Off by default, because most web applications use the
+    /// real Host to build links and cookies, and rewriting it would break them instead.
+    /// </para>
+    /// </summary>
+    public bool RewriteHostHeader { get; set; }
+
+    /// <summary>
     /// HTTP only. Which of the two public schemes this hostname answers on. The gateway always
     /// listens on both ports; this decides what each does for this particular tunnel.
     /// </summary>

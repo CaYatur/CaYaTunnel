@@ -215,6 +215,25 @@ says that rather than inventing a green tick.
 
 ---
 
+## The service answers locally but 400s through the tunnel
+
+Some tools only expect to be reached on localhost and check the `Host` header to enforce it —
+it is how they defend against DNS rebinding, and ActivityWatch, Jupyter, Home Assistant and
+various dashboards all do it. A tunnel presents the public hostname, so they refuse the request,
+usually with a bare 400 or 403 that explains nothing.
+
+Edit the tunnel and turn on **Present the target's own address to the service**. The gateway then
+replaces the `Host` header with the target's own `host:port` on every request, leaving everything
+else byte for byte the same.
+
+Leave it off unless you need it: most web applications use the real `Host` to build their own
+links, cookies and redirects, and rewriting it would break those instead.
+
+It only applies where the gateway can see the request — a website tunnel that terminates TLS, or
+plain HTTP. A TLS passthrough tunnel is encrypted end to end and has no header here to change.
+
+---
+
 ## DNS
 
 Hostname tunnels need DNS pointing at the gateway. Two ways:

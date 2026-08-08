@@ -147,6 +147,10 @@ public static class Strings
             "UDP aynı güvenilir bağlantı üzerinden taşınır; paket kaybı olan bir hatta paket düşmek yerine gecikme artar."),
 
         // ---- HTTP access ----
+        ["RewriteHost"] = new("Present the target's own address to the service", "Servise kendi adresini göster"),
+        ["RewriteHostHint"] = new(
+            "Turn on if the service answers 400 or 403 through the tunnel but works locally. Many local-only tools reject requests whose Host header is not localhost, as protection against DNS rebinding. Leave off otherwise: most web apps use the real Host to build their own links.",
+            "Servis yerelde çalışıp tünel üzerinden 400 veya 403 veriyorsa aç. Birçok yerel araç, DNS rebinding koruması olarak Host başlığı localhost olmayan istekleri reddeder. Diğer durumlarda kapalı bırak: çoğu web uygulaması kendi bağlantılarını gerçek Host'a göre üretir."),
         ["HttpAccess"] = new("Reachable over", "Erişim şeması"),
         ["HttpAccessBoth"] = new("HTTP and HTTPS", "HTTP ve HTTPS"),
         ["HttpAccessHttpsOnly"] = new("HTTPS only", "Yalnızca HTTPS"),
