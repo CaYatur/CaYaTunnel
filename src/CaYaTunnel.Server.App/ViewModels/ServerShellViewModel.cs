@@ -128,10 +128,32 @@ public sealed class ServerShellViewModel : ViewModelBase
     public ServerPage Page
     {
         get => _page;
-        set => Set(ref _page, value);
+        set
+        {
+            if (Set(ref _page, value))
+            {
+                // The views switch on PageName, not on Page. Without this the selected page
+                // never changes: the nav button highlights and nothing else happens.
+                Raise(nameof(PageName));
+            }
+        }
     }
 
-    public string PageName => Page.ToString();
+    /// <summary>
+    /// The selected page as a string. Settable so the navigation buttons can bind their checked
+    /// state to it two-way, which keeps the sidebar showing where you actually are.
+    /// </summary>
+    public string PageName
+    {
+        get => Page.ToString();
+        set
+        {
+            if (Enum.TryParse<ServerPage>(value, out var page))
+            {
+                Page = page;
+            }
+        }
+    }
 
     public bool IsRunning => _previewMode || _server.IsRunning;
 
@@ -192,6 +214,16 @@ public sealed class ServerShellViewModel : ViewModelBase
 
     private async Task StartAsync()
     {
+        // The Windows service runs in another logon session, where the single-instance mutex
+        // cannot reach it — but it binds the same ports from the same data directory. Asking the
+        // service control manager is the one check that works across sessions, and it turns a
+        // confusing "address already in use" into a sentence that says what to do.
+        if (WindowsServiceManager.IsRunning)
+        {
+            SetMessage(Loc.Get("ServiceAlreadyRunning"), true);
+            return;
+        }
+
         try
         {
             await _server.StartAsync();

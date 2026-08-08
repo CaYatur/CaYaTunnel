@@ -14,6 +14,7 @@
     <ui:StringToVisibilityConverter x:Key="StringToVisibility" />
     <ui:CountToVisibilityConverter x:Key="CountToVisibility" />
     <ui:EqualityToVisibilityConverter x:Key="PageVisibility" />
+    <ui:PageSelectionConverter x:Key="PageSelection" />
   </Window.Resources>
 
   <Border Background="{StaticResource BackgroundBrush}" BorderBrush="{StaticResource BorderBrush}"
@@ -82,18 +83,18 @@
 
           <!-- Navigation -->
           <StackPanel Grid.Column="0" Margin="12,6,6,12">
-            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav" IsChecked="True"
-                         Command="{Binding GoToCommand}" CommandParameter="Overview" Content="{ui:L NavOverview}" />
             <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                         Command="{Binding GoToCommand}" CommandParameter="Tunnels" Content="{ui:L NavTunnels}" />
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Overview}" Content="{ui:L NavOverview}" />
             <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                         Command="{Binding GoToCommand}" CommandParameter="Devices" Content="{ui:L NavDevices}" />
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Tunnels}" Content="{ui:L NavTunnels}" />
             <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                         Command="{Binding GoToCommand}" CommandParameter="Clients" Content="{ui:L NavClients}" />
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Devices}" Content="{ui:L NavDevices}" />
             <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                         Command="{Binding GoToCommand}" CommandParameter="Log" Content="{ui:L NavLog}" />
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Clients}" Content="{ui:L NavClients}" />
             <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
-                         Command="{Binding GoToCommand}" CommandParameter="Settings" Content="{ui:L NavSettings}" />
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Log}" Content="{ui:L NavLog}" />
+            <RadioButton Style="{StaticResource NavButton}" GroupName="Nav"
+                         IsChecked="{Binding PageName, Mode=TwoWay, Converter={StaticResource PageSelection}, ConverterParameter=Settings}" Content="{ui:L NavSettings}" />
 
             <Border Height="1" Background="{StaticResource BorderSubtleBrush}" Margin="6,14,6,14" />
 

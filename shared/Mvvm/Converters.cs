@@ -69,6 +69,23 @@ public sealed class EqualityToVisibilityConverter : IValueConverter
         => Binding.DoNothing;
 }
 
+/// <summary>
+/// Binds a navigation button's checked state to the selected page, in both directions.
+/// <para>
+/// Without this the sidebar tracks clicks rather than state, so anything that changes the page
+/// in code — a failed gateway start sending the operator to Settings, say — leaves the highlight
+/// pointing at the wrong entry.
+/// </para>
+/// </summary>
+public sealed class PageSelectionConverter : IValueConverter
+{
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => Equals(value?.ToString(), parameter?.ToString());
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => value is true ? parameter?.ToString() ?? Binding.DoNothing : Binding.DoNothing;
+}
+
 /// <summary>Byte counts as something a person can read at a glance.</summary>
 public sealed class ByteSizeConverter : IValueConverter
 {

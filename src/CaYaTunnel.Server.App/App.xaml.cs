@@ -11,6 +11,7 @@ namespace CaYaTunnel.Server.App;
 public partial class App : Application
 {
     private ServerShellViewModel? _shell;
+    private SingleInstance? _instance;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -27,11 +28,21 @@ public partial class App : Application
 
         ServerPaths.EnsureCreated();
 
+        // Keyed on the data directory, which is what a second gateway would collide over: the
+        // same registry, the same certificates, and the same public ports.
+        if (!SingleInstance.TryClaim(ServerPaths.DataDirectory, out _instance))
+        {
+            Shutdown();
+            return;
+        }
+
         _shell = new ServerShellViewModel();
 
         var window = new MainWindow { DataContext = _shell };
         MainWindow = window;
         window.Show();
+
+        _instance!.SecondInstanceAttempted += () => WindowActivation.BringToFront(window);
 
         if (_shell.Config.AutoStartGateway)
         {
@@ -42,6 +53,7 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         _shell?.ShutdownAsync().GetAwaiter().GetResult();
+        _instance?.Dispose();
         base.OnExit(e);
     }
 
@@ -57,21 +69,30 @@ public partial class App : Application
         var directory = index + 1 < args.Length ? args[index + 1] : "screenshots";
         var shell = ServerShellViewModel.CreatePreview();
 
-        ScreenCapture.Save(new MainWindow { DataContext = shell },
-            Path.Combine(directory, "server-overview.png"), 1120, 720);
+        // One window, navigated between pages — see the client app for why this matters.
+        var window = new MainWindow { DataContext = shell };
+        window.Width = 1120;
+        window.Height = 720;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -20000;
+        window.Top = -20000;
+        window.ShowInTaskbar = false;
+        window.Show();
 
-        shell.Page = ServerPage.Devices;
-        ScreenCapture.Save(new MainWindow { DataContext = shell },
-            Path.Combine(directory, "server-devices.png"), 1120, 720);
+        foreach (var (page, name) in new[]
+        {
+            (ServerPage.Overview, "server-overview.png"),
+            (ServerPage.Tunnels, "server-tunnels.png"),
+            (ServerPage.Devices, "server-devices.png"),
+            (ServerPage.Clients, "server-clients.png"),
+            (ServerPage.Settings, "server-settings.png"),
+        })
+        {
+            shell.GoToCommand.Execute(page.ToString());
+            ScreenCapture.SaveCurrent(window, Path.Combine(directory, name), 1120, 720);
+        }
 
-        shell.Page = ServerPage.Clients;
-        ScreenCapture.Save(new MainWindow { DataContext = shell },
-            Path.Combine(directory, "server-clients.png"), 1120, 720);
-
-        shell.Page = ServerPage.Settings;
-        ScreenCapture.Save(new MainWindow { DataContext = shell },
-            Path.Combine(directory, "server-settings.png"), 1120, 720);
-
+        window.Close();
         return true;
     }
 

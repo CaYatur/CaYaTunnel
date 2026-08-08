@@ -299,6 +299,9 @@ public static class Strings
         ["RunAsServiceHint"] = new(
             "Keeps the gateway running without anyone signed in. Needs administrator rights.",
             "Kimse oturum açmadan ağ geçidini çalışır tutar. Yönetici hakkı gerekir."),
+        ["ServiceAlreadyRunning"] = new(
+            "The CaYaTunnel service is already running and holds these ports. Stop the service before starting the gateway here, or just manage it from this window while the service serves the traffic.",
+            "CaYaTunnel hizmeti zaten çalışıyor ve bu portları tutuyor. Ağ geçidini buradan başlatmadan önce hizmeti durdur, ya da trafiği hizmet taşırken bu pencereyi yalnızca yönetim için kullan."),
         ["InstallService"] = new("Install service", "Hizmeti kur"),
         ["UninstallService"] = new("Remove service", "Hizmeti kaldır"),
         ["AutoStartGateway"] = new("Start the gateway when this app opens", "Uygulama açıldığında ağ geçidini başlat"),

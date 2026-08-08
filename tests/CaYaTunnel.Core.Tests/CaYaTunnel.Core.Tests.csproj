@@ -1,10 +1,27 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Windows-targeted so the desktop view models can be tested directly. The suite was already
+      Windows-only in practice — it exercises Schannel, DPAPI and the certificate store — and a
+      navigation bug that shipped was invisible until the view models could be asserted on.
+    -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <IsPackable>false</IsPackable>
     <RootNamespace>CaYaTunnel.Tests</RootNamespace>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      UseWPF swaps the implicit using set for the desktop one, which drops System.IO. Adding it
+      back keeps the existing tests compiling unchanged rather than sprinkling usings through
+      files that have nothing to do with the UI.
+    -->
+    <Using Include="System.IO" />
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
@@ -16,6 +33,7 @@
     <ProjectReference Include="..\..\src\CaYaTunnel.Core\CaYaTunnel.Core.csproj" />
     <ProjectReference Include="..\..\src\CaYaTunnel.Server\CaYaTunnel.Server.csproj" />
     <ProjectReference Include="..\..\src\CaYaTunnel.Client\CaYaTunnel.Client.csproj" />
+    <ProjectReference Include="..\..\src\CaYaTunnel.Client.App\CaYaTunnel.Client.App.csproj" />
   </ItemGroup>
 
 </Project>

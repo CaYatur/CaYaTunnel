@@ -31,6 +31,23 @@ public static class ScreenCapture
         window.ShowInTaskbar = false;
         window.Show();
 
+        Render(window, path, width, height, scale);
+        window.Close();
+    }
+
+    /// <summary>
+    /// Renders a window that is already open, leaving it open.
+    /// <para>
+    /// This is what makes the capture worth running: a fresh window per screen renders whatever
+    /// the view model currently says and passes even when navigation is broken. Reusing one
+    /// window exercises the same path a person clicking the sidebar does.
+    /// </para>
+    /// </summary>
+    public static void SaveCurrent(Window window, string path, int width, int height, double scale = 1.5)
+        => Render(window, path, width, height, scale);
+
+    private static void Render(Window window, string path, int width, int height, double scale)
+    {
         // Let WPF finish measure, arrange and the first render pass; without draining the
         // dispatcher the bitmap comes out blank.
         window.UpdateLayout();
@@ -51,8 +68,6 @@ public static class ScreenCapture
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         using var stream = File.Create(path);
         encoder.Save(stream);
-
-        window.Close();
     }
 
     private static void Drain()

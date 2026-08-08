@@ -14,6 +14,7 @@ public partial class App : Application
 
     private ShellViewModel? _shell;
     private TrayIcon? _tray;
+    private SingleInstance? _instance;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -38,6 +39,15 @@ public partial class App : Application
         }
 
         var store = new ClientSettingsStore();
+
+        // Keyed on the settings file: a second copy of this install would fight over the same
+        // device identity, while a separate portable copy pointed at another gateway is fine.
+        if (!SingleInstance.TryClaim(store.Path, out _instance))
+        {
+            Shutdown();
+            return;
+        }
+
         var settings = store.Load();
         var embedded = ClientConfigBlob.ReadFromCurrentProcess();
         var profile = ClientConnectionProfile.Resolve(settings, embedded);
@@ -48,6 +58,9 @@ public partial class App : Application
         MainWindow = window;
 
         _tray = new TrayIcon(_shell, window);
+
+        // Launching again is how a user asks for the window back when it is hidden in the tray.
+        _instance!.SecondInstanceAttempted += () => WindowActivation.BringToFront(window);
 
         // Launching hidden is the normal case for "start with Windows": the agent should just
         // be there in the tray, not steal focus every sign-in.
@@ -69,6 +82,7 @@ public partial class App : Application
     {
         _tray?.Dispose();
         _shell?.ShutdownAsync().GetAwaiter().GetResult();
+        _instance?.Dispose();
         base.OnExit(e);
     }
 
@@ -97,22 +111,29 @@ public partial class App : Application
         var shell = new ShellViewModel(store, settings, profile);
         shell.LoadPreviewSnapshot(PreviewData.Build());
 
-        ScreenCapture.Save(
-            new MainWindow { DataContext = shell },
-            Path.Combine(directory, "client-tunnels.png"),
-            1080, 700);
+        // One window for every page, switched the way the sidebar switches it. A window per page
+        // would render correctly even with navigation broken, which is how that bug shipped.
+        var window = new MainWindow { DataContext = shell };
+        window.Width = 1080;
+        window.Height = 700;
+        window.WindowStartupLocation = WindowStartupLocation.Manual;
+        window.Left = -20000;
+        window.Top = -20000;
+        window.ShowInTaskbar = false;
+        window.Show();
 
-        shell.Page = ClientPage.Devices;
-        ScreenCapture.Save(
-            new MainWindow { DataContext = shell },
-            Path.Combine(directory, "client-devices.png"),
-            1080, 700);
+        foreach (var (page, name) in new[]
+        {
+            (ClientPage.Tunnels, "client-tunnels.png"),
+            (ClientPage.Devices, "client-devices.png"),
+            (ClientPage.Settings, "client-settings.png"),
+        })
+        {
+            shell.GoToCommand.Execute(page.ToString());
+            ScreenCapture.SaveCurrent(window, Path.Combine(directory, name), 1080, 700);
+        }
 
-        shell.Page = ClientPage.Settings;
-        ScreenCapture.Save(
-            new MainWindow { DataContext = shell },
-            Path.Combine(directory, "client-settings.png"),
-            1080, 700);
+        window.Close();
 
         ScreenCapture.Save(
             new Views.NewTunnelDialog { DataContext = new NewTunnelViewModel(shell) },

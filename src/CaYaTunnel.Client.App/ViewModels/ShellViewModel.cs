@@ -104,10 +104,32 @@ public sealed class ShellViewModel : ViewModelBase
     public ClientPage Page
     {
         get => _page;
-        set => Set(ref _page, value);
+        set
+        {
+            if (Set(ref _page, value))
+            {
+                // The views switch on PageName, not on Page. Without this the selected page
+                // never changes: the nav button highlights and nothing else happens.
+                Raise(nameof(PageName));
+            }
+        }
     }
 
-    public string PageName => Page.ToString();
+    /// <summary>
+    /// The selected page as a string. Settable so the navigation buttons can bind their checked
+    /// state to it two-way, which keeps the sidebar showing where you actually are.
+    /// </summary>
+    public string PageName
+    {
+        get => Page.ToString();
+        set
+        {
+            if (Enum.TryParse<ClientPage>(value, out var page))
+            {
+                Page = page;
+            }
+        }
+    }
 
     public bool ShowAllDevices
     {
