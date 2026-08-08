@@ -278,7 +278,11 @@ public sealed class TunnelRegistry
 
                 case TunnelKind.TcpHostAware:
                     tunnel.Hostname = AllocateHostname(request.Subdomain, config);
-                    tunnel.PublicPort = config.MinecraftPort;
+
+                    // Where players actually connect. In single-port mode the Minecraft router
+                    // lives on the shared port, so recording 25565 would print an address that
+                    // reaches nothing.
+                    tunnel.PublicPort = config.SinglePortMode ? config.ControlPort : config.MinecraftPort;
                     tunnel.Protocol = string.IsNullOrWhiteSpace(request.Protocol)
                         ? HostAwareProtocols.MinecraftJava
                         : request.Protocol;

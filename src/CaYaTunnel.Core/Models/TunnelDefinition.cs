@@ -97,14 +97,29 @@ public sealed class TunnelDefinition
     /// <summary>Live count of streams currently open for this tunnel; not persisted.</summary>
     public int ActiveConnections { get; set; }
 
-    /// <summary>What a user would paste to reach this tunnel.</summary>
+    /// <summary>
+    /// What a user would paste to reach this tunnel.
+    /// <para>
+    /// The port is included whenever it is not the default for the scheme. Leaving it out when
+    /// the gateway is not on 443 produces an address that looks right, is trivially copied, and
+    /// goes somewhere else entirely — usually whatever else is on 443 on that machine.
+    /// </para>
+    /// </summary>
     public string PublicEndpoint(ServerInfo server) => Kind switch
     {
-        TunnelKind.HttpHost => $"{HttpScheme}://{Hostname}",
+        TunnelKind.HttpHost => $"{HttpScheme}://{Hostname}{HttpPortSuffix(server)}",
         TunnelKind.TcpHostAware => $"{Hostname}:{PublicPort ?? 0}",
         TunnelKind.PortForward => $"{server.PublicHost}:{PublicPort ?? 0}",
         _ => "-",
     };
+
+    private string HttpPortSuffix(ServerInfo server)
+    {
+        var port = HttpAccess == HttpAccess.HttpOnly ? server.HttpPort : server.HttpsPort;
+        var standard = HttpAccess == HttpAccess.HttpOnly ? 80 : 443;
+
+        return port == standard ? string.Empty : $":{port}";
+    }
 
     /// <summary>The scheme to show for an HTTP tunnel — http only when TLS is genuinely off.</summary>
     public string HttpScheme => HttpAccess == HttpAccess.HttpOnly ? "http" : "https";

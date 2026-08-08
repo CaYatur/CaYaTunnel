@@ -79,6 +79,31 @@ internal static class TestPorts
     /// </summary>
     public static int RangeStart()
         => System.Security.Cryptography.RandomNumberGenerator.GetInt32(20000, 29000);
+
+    /// <summary>
+    /// A port free for TCP <em>and</em> UDP. Needed wherever one number serves both, because
+    /// Windows reserves whole UDP ranges for Hyper-V and WinNAT: a port TCP happily accepted can
+    /// still refuse a UDP bind with access-denied.
+    /// </summary>
+    public static int FreeForBothProtocols()
+    {
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            var port = Free();
+
+            try
+            {
+                using var probe = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+                return port;
+            }
+            catch (SocketException)
+            {
+                // Reserved for UDP, or taken between the two binds. Try another.
+            }
+        }
+
+        throw new InvalidOperationException("Could not find a port free for both TCP and UDP.");
+    }
 }
 
 /// <summary>A loopback TCP server that echoes everything back — stands in for a local service.</summary>

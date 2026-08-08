@@ -38,7 +38,10 @@ public class SinglePortModeTests : IAsyncLifetime
         {
             ServerName = "Single Port Gateway",
             SinglePortMode = true,
-            ControlPort = TestPorts.Free(),
+
+            // The shared port carries TCP and UDP on the same number, so it has to be bindable
+            // for both — the same constraint a real operator faces when choosing it.
+            ControlPort = TestPorts.FreeForBothProtocols(),
             ControlBindAddress = "127.0.0.1",
             PublicHost = "127.0.0.1",
             BaseDomain = "tunnel.example.test",

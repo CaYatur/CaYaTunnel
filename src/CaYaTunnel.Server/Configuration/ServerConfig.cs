@@ -136,9 +136,13 @@ public sealed class ServerConfig
         ServerName = ServerName,
         PublicHost = PublicHost,
         BaseDomain = BaseDomain,
-        HttpPort = HttpPort,
-        HttpsPort = HttpsPort,
-        MinecraftPort = MinecraftPort,
+
+        // In single-port mode visitors arrive on the shared port, so that is what the ports
+        // reported to clients have to say. Reporting 443 here would have every tunnel display an
+        // address that goes to whatever else is on 443.
+        HttpPort = SinglePortMode ? ControlPort : HttpPort,
+        HttpsPort = SinglePortMode ? ControlPort : HttpsPort,
+        MinecraftPort = SinglePortMode ? ControlPort : MinecraftPort,
         TcpPortRangeStart = TcpPortRangeStart,
         TcpPortRangeEnd = TcpPortRangeEnd,
         DnsAutomationEnabled = dnsAutomationEnabled,

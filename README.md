@@ -163,6 +163,31 @@ port is already taken, the gateway says so and leaves it alone rather than half-
 > and answered Cloudflare with its own certificate instead of your site's. Leave single-port mode
 > on, or turn the HTTP router off, and your existing site is untouched.
 
+### Getting a clean `https://name.example.com` while something else owns 443
+
+In single-port mode your tunnels live on the control port, so the address is
+`https://name.example.com:48771`. That is what the app shows you, and it works. If you want the
+address without the port and 443 already belongs to another web server on that machine, you have
+three options — none of which involve taking 443 away from it.
+
+**1. Cloudflare Origin Rules (nothing to change on the server).** Proxy the record (orange cloud),
+then add **Rules → Origin Rules**: when *Hostname ends with* `.tunnel.example.com`, set
+**Destination Port** to your control port. Visitors use 443, Cloudflare connects to the gateway's
+port, and your existing site keeps 443 to itself.
+
+Set **SSL/TLS → Overview** to *Full*, which accepts the gateway's self-signed certificate. For
+*Full (strict)*, download a Cloudflare **Origin Certificate** and point
+**Settings → Public TLS certificate** at it — the same certificate your other site already uses
+is fine.
+
+**2. Let the existing web server pass unknown hostnames through.** If it is nginx or IIS, add a
+server block or site binding for `*.tunnel.example.com` that proxies to `127.0.0.1:48771`.
+Everything stays on 443 and the gateway never touches it.
+
+**3. Give the gateway 443 and move the other server.** Turn single-port mode off and move your
+existing site to another port. The most disruptive of the three; only worth it if the gateway is
+the main thing that machine does.
+
 ### Firewall rules
 
 **Settings → Windows Firewall** lists exactly which ports your current configuration needs and
