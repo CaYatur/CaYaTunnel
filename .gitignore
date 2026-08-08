@@ -1,0 +1,33 @@
+## Build output
+bin/
+obj/
+artifacts/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+## Runtime data — NEVER commit. Contains Cloudflare tokens, device keys, TLS private keys.
+data/
+*.cayatunnel-state.json
+appsettings.Local.json
+appsettings.Production.json
+server.pfx
+*.pfx
+*.key
+*.pem
+
+## Provisioned client binaries (they embed device credentials)
+provisioned/
+*.provisioned.exe
+
+## Logs
+logs/
+*.log
+
+## OS
+Thumbs.db
+desktop.ini
+.DS_Store

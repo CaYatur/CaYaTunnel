@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CaYaTunnel.Server</RootNamespace>
+    <AssemblyName>CaYaTunnel.Server</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CaYaTunnel.Core\CaYaTunnel.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CaYaTunnel.Core.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CaYaTunnel.Client/CaYaTunnel.Client.csproj" />
+    <Project Path="src/CaYaTunnel.Core/CaYaTunnel.Core.csproj" />
+    <Project Path="src/CaYaTunnel.Server/CaYaTunnel.Server.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CaYaTunnel.Core.Tests/CaYaTunnel.Core.Tests.csproj" />
+  </Folder>
+</Solution>

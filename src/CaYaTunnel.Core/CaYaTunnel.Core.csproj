@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CaYaTunnel.Core</RootNamespace>
+    <AssemblyName>CaYaTunnel.Core</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CaYaTunnel.Core.Tests" />
+  </ItemGroup>
+
+</Project>
