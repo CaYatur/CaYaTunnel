@@ -125,10 +125,16 @@
                        Foreground="{StaticResource WarningBrush}"
                        Visibility="{Binding ShowsUdpNote, Converter={StaticResource BoolToVisibility}}" />
 
-            <TextBlock Text="{ui:L FieldPublicPort}" Style="{StaticResource FieldLabel}" Margin="0,14,0,5" />
-            <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left"
-                     Text="{Binding PublicPort, UpdateSourceTrigger=PropertyChanged}" />
-            <TextBlock Text="{ui:L FieldPublicPortHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+            <CheckBox Style="{StaticResource SwitchToggle}" Content="{ui:L UseSharedPort}"
+                      IsChecked="{Binding UseSharedPort}" Margin="0,14,0,0" />
+            <TextBlock Text="{ui:L UseSharedPortHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,4" />
+
+            <StackPanel Visibility="{Binding ShowsPublicPortField, Converter={StaticResource BoolToVisibility}}">
+              <TextBlock Text="{ui:L FieldPublicPort}" Style="{StaticResource FieldLabel}" Margin="0,10,0,5" />
+              <TextBox Style="{StaticResource FieldInput}" Width="160" HorizontalAlignment="Left"
+                       Text="{Binding PublicPort, UpdateSourceTrigger=PropertyChanged}" />
+              <TextBlock Text="{ui:L FieldPublicPortHint}" Style="{StaticResource FieldHint}" Margin="0,0,0,14" />
+            </StackPanel>
           </StackPanel>
 
           <!-- Device -->

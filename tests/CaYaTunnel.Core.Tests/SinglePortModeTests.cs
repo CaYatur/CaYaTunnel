@@ -194,10 +194,113 @@ public class SinglePortModeTests : IAsyncLifetime
     }
 
     [Fact]
-    public void A_port_tunnel_still_needs_a_port_of_its_own()
+    public async Task A_plain_tcp_service_can_ride_the_shared_port_too()
     {
-        // Stated as a test because it is a real limit, not an oversight: a protocol that carries
-        // no destination cannot be told apart from any other on a shared port.
+        await using var service = EchoServer.Start();
+
+        var created = await _client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Name = "SSH",
+            Kind = TunnelKind.PortForward,
+            Transports = TransportProtocols.Tcp,
+            UseSharedPort = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = service.Port,
+        });
+        Assert.True(created.Ok, created.Error);
+
+        var tunnel = _registry.Tunnels.Single(t => t.Name == "SSH");
+        Assert.True(tunnel.UseSharedPort);
+        Assert.Equal(_config.ControlPort, tunnel.PublicPort);
+
+        // Bytes that match no known protocol, on the port the agent is already using.
+        using var visitor = new TcpClient();
+        await visitor.ConnectAsync(IPAddress.Loopback, _config.ControlPort).WaitAsync(TimeSpan.FromSeconds(15));
+
+        var stream = visitor.GetStream();
+        var payload = Encoding.UTF8.GetBytes("SSH-2.0-OpenSSH_9.6\r\n");
+        await stream.WriteAsync(payload);
+        await stream.FlushAsync();
+
+        var buffer = new byte[payload.Length];
+        var total = 0;
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        while (total < buffer.Length)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(total), timeout.Token);
+            if (read == 0)
+            {
+                break;
+            }
+
+            total += read;
+        }
+
+        Assert.Equal(payload, buffer[..total]);
+        Assert.Equal(ClientState.Online, _client.State);
+    }
+
+    [Fact]
+    public async Task Only_one_tcp_tunnel_can_claim_the_shared_port()
+    {
+        await using var service = EchoServer.Start();
+
+        var first = await _client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Name = "first",
+            Kind = TunnelKind.PortForward,
+            UseSharedPort = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = service.Port,
+        });
+        Assert.True(first.Ok, first.Error);
+
+        // Traffic that announces no destination must have exactly one place to go, so a second
+        // claim is refused with a message that says what to do instead.
+        var second = await _client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Name = "second",
+            Kind = TunnelKind.PortForward,
+            UseSharedPort = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = service.Port,
+        });
+
+        Assert.False(second.Ok);
+        Assert.Contains("own port", second.Error!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task A_udp_service_shares_the_same_port_number_as_the_tcp_side()
+    {
+        await using var service = UdpEchoServer.Start();
+
+        // UDP and TCP are separate namespaces, so the same number serves both without conflict.
+        var created = await _client.CreateTunnelAsync(new CreateTunnelRequest
+        {
+            Name = "Game",
+            Kind = TunnelKind.PortForward,
+            Transports = TransportProtocols.Udp,
+            UseSharedPort = true,
+            TargetHost = "127.0.0.1",
+            TargetPort = service.Port,
+        });
+        Assert.True(created.Ok, created.Error);
+
+        using var visitor = new UdpClient();
+        var payload = Encoding.UTF8.GetBytes("udp on the shared port");
+        await visitor.SendAsync(payload, new IPEndPoint(IPAddress.Loopback, _config.ControlPort));
+
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        var reply = await visitor.ReceiveAsync(timeout.Token);
+
+        Assert.Equal(payload, reply.Buffer);
+        Assert.Equal(ClientState.Online, _client.State);
+    }
+
+    [Fact]
+    public void Only_the_shared_port_is_reserved()
+    {
         Assert.Single(_config.ReservedPorts());
         Assert.Contains(_config.ReservedPorts(), r => r.Name == "control port");
     }

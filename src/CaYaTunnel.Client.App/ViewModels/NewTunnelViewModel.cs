@@ -25,6 +25,7 @@ public sealed class NewTunnelViewModel : ViewModelBase
     private DeviceChoice? _device;
     private int _transportIndex;
     private int _httpAccessIndex;
+    private bool _useSharedPort;
 
     public NewTunnelViewModel(ShellViewModel shell)
     {
@@ -227,6 +228,24 @@ public sealed class NewTunnelViewModel : ViewModelBase
         set => Set(ref _publicPort, value);
     }
 
+    /// <summary>
+    /// Ride the gateway's shared port instead of taking one of its own — the difference between
+    /// forwarding one port and forwarding several.
+    /// </summary>
+    public bool UseSharedPort
+    {
+        get => _useSharedPort;
+        set
+        {
+            if (Set(ref _useSharedPort, value))
+            {
+                Raise(nameof(ShowsPublicPortField));
+            }
+        }
+    }
+
+    public bool ShowsPublicPortField => !UseSharedPort;
+
     public bool TerminateTls
     {
         get => _terminateTls;
@@ -281,6 +300,7 @@ public sealed class NewTunnelViewModel : ViewModelBase
             TerminateTls = TerminateTls,
             HttpAccess = HttpAccess,
             Transports = Transports,
+            UseSharedPort = IsPortKind && UseSharedPort,
         });
 
         if (result.Ok)

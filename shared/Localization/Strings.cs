@@ -168,6 +168,13 @@ public static class Strings
             "Bu makinedeki bir servis için 127.0.0.1, başka bir makine için 192.168.1.20 gibi bir ağ adresi."),
         ["FieldTargetPort"] = new("Target port", "Hedef port"),
         ["FieldPublicPort"] = new("Public port", "Genel port"),
+        ["UseSharedPort"] = new("Use the server's shared port", "Sunucunun paylaşılan portunu kullan"),
+        ["UseSharedPortHint"] = new(
+            "No extra port to open — this rides the one port the gateway already listens on. Only one TCP and one UDP tunnel can, because traffic that announces no destination has to have exactly one place to go.",
+            "Açılacak ek port yok — ağ geçidinin zaten dinlediği tek portu kullanır. Bunu yalnızca bir TCP ve bir UDP tüneli yapabilir, çünkü hedefini belirtmeyen trafiğin gidebileceği tek bir yer olmalı."),
+        ["SharedPortUnavailable"] = new(
+            "The shared port is already taken by another tunnel, or single-port mode is off on the server.",
+            "Paylaşılan port başka bir tünel tarafından alınmış ya da sunucuda tek port modu kapalı."),
         ["FieldPublicPortHint"] = new(
             "Leave empty to let the server pick a free one.",
             "Sunucunun boş bir tane seçmesi için boş bırak."),

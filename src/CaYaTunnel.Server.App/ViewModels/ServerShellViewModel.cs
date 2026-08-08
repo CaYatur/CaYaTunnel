@@ -47,6 +47,10 @@ public sealed class ServerShellViewModel : ViewModelBase
         _server = new TunnelServer(Config, _registry, _log);
 
         _server.StateChanged += () => OnUiThread(Refresh);
+
+        // A listener that could not bind is shown, not just logged: from the outside it looks
+        // identical to a broken tunnel, and the cause is usually another service holding the port.
+        _server.ListenerFailed += message => OnUiThread(() => SetMessage(message, true));
         _log.Entry += entry => OnUiThread(() => AppendLog(entry));
 
         Settings = new ServerSettingsViewModel(this, _configStore, _server);

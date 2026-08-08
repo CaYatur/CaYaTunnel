@@ -122,33 +122,46 @@ Delete someone else's tunnel and the machine that owned it says so.
 **On every client machine: none.** Not one, ever. The agent dials out; nothing dials in. This
 is the whole point and there is no configuration that changes it.
 
-**On the gateway**, it depends on what you serve:
+**On the gateway: one is usually enough.** Single-port mode is the default, and one port carries:
 
-| What you run | Ports the gateway needs |
+| What you run | Fits on the one port? |
 |---|---|
-| Websites and/or Minecraft only | **One.** Turn on *Share one port for everything possible* |
-| Websites on the standard 80/443 | Three: control, 80, 443 |
-| Anything with its own public port (game servers, SSH, databases) | One per tunnel, plus the above |
+| Agent connections from every device | Yes, any number |
+| Websites — `panel.example.com`, `dfrkr.example.com`, any number | Yes, any number |
+| Minecraft servers, any number | Yes, any number |
+| One plain TCP service (SSH, a database, a game) | Yes — tick *Use the server's shared port* |
+| One UDP service | Yes, same port number |
+| A **second** plain TCP or UDP service | No — needs a port of its own |
 
-### Single-port mode
+So one forwarded port covers every hostname-based tunnel you will ever make, plus one plain TCP
+and one UDP service. Only a second plain service costs another port.
 
-Agent links, websites and Minecraft can all arrive on the control port, because each announces
-where it is going in its first bytes — the agent by its TLS server name, a website by SNI or the
-`Host` header, Minecraft by its handshake. The gateway reads that and hands the connection to the
-right place.
+### How one port can carry all of that
 
-Turn it on in **Settings → Listeners**. Forward that one port and you are done.
+Everything except a plain socket announces where it is going in its first bytes: the agent by its
+TLS server name, a website by SNI or the `Host` header, Minecraft by its handshake. The gateway
+reads that and hands the connection on. Whatever announces nothing goes to the tunnel that
+claimed the shared port — which is why exactly one may claim it, per protocol.
 
 The trade: visitors reach websites on that port (`https://panel.example.com:48771`) rather than
-on 443, unless something in front maps it for you — Cloudflare's proxy can, and so can any load
-balancer. If you want bare `https://panel.example.com`, use 443.
+on 443, unless something in front maps it — Cloudflare's proxy can, and so can any load balancer.
+If you want bare `https://panel.example.com`, use 443.
 
-### Why port tunnels still need their own port
+### Why a second plain service cannot share
 
-A plain TCP or UDP protocol carries no destination. A database client and a game client both open
-a socket and start talking, with nothing in the bytes to say which tunnel they meant. The port
-number has to *be* the destination — so each one needs its own, and no amount of cleverness
-removes that. Anything claiming otherwise is guessing.
+A plain TCP or UDP protocol carries no destination. Two database clients arriving on one port
+look identical, and nothing in the bytes says which tunnel each meant. The port number has to
+*be* the destination. One can be the default; a second cannot be guessed.
+
+### It will not touch 80, 443 or 25565 unless you ask
+
+Single-port mode is the default precisely because a gateway that helps itself to those on a
+server already running a website is an ambush. If you do turn the separate listeners on and a
+port is already taken, the gateway says so and leaves it alone rather than half-sharing it.
+
+> **Seeing Cloudflare error 525 after starting the gateway?** That is this: the gateway had 443
+> and answered Cloudflare with its own certificate instead of your site's. Leave single-port mode
+> on, or turn the HTTP router off, and your existing site is untouched.
 
 ### Firewall rules
 

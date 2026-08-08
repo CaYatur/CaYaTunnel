@@ -60,6 +60,14 @@ public sealed partial class TunnelServer : IAsyncDisposable
 
     public event Action? StateChanged;
 
+    /// <summary>
+    /// Raised when a listener could not bind. Surfaced in the UI rather than only logged: a
+    /// listener that silently does nothing looks exactly like a broken tunnel.
+    /// </summary>
+    public event Action<string>? ListenerFailed;
+
+    internal void ReportListenerFailure(string message) => ListenerFailed?.Invoke(message);
+
     public ServerInfo BuildServerInfo() => Config.ToServerInfo(_dns.IsAutomated);
 
     // ---- Lifecycle ---------------------------------------------------------
@@ -191,7 +199,10 @@ public sealed partial class TunnelServer : IAsyncDisposable
     private async Task RunControlListenerAsync(CancellationToken cancellationToken)
     {
         var address = IPAddress.TryParse(Config.ControlBindAddress, out var parsed) ? parsed : IPAddress.Any;
-        var listener = new TcpListener(address, Config.ControlPort);
+
+        // See the public listeners: exclusive so this can never end up sharing a port with
+        // something else and taking half its traffic.
+        var listener = new TcpListener(address, Config.ControlPort) { ExclusiveAddressUse = true };
 
         try
         {

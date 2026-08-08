@@ -37,10 +37,13 @@ public static class FirewallManager
 
         foreach (var (name, protocol, ports) in Plan(config))
         {
-            var (exitCode, output) = Run("netsh",
-                $"advfirewall firewall add rule name=\"{RulePrefix} {name}\" dir=in action=allow " +
-                $"protocol={protocol} localport={ports} profile=any enable=yes " +
-                $"description=\"Created by CaYaTunnel\" group=\"{Group}\"");
+            // New-NetFirewallRule rather than netsh: netsh has no way to set a rule's group on
+            // creation (its group= argument only filters existing rules), and the group is what
+            // makes removal exact later.
+            var (exitCode, output) = RunPowerShell(
+                $"New-NetFirewallRule -DisplayName '{RulePrefix} {Escape(name)}' -Group '{Group}' " +
+                $"-Direction Inbound -Action Allow -Protocol {protocol} -LocalPort {ports} " +
+                "-Profile Any -Enabled True -Description 'Created by CaYaTunnel' | Out-Null");
 
             if (exitCode != 0)
             {
@@ -62,20 +65,26 @@ public static class FirewallManager
             return (false, "Removing firewall rules needs administrator rights.");
         }
 
-        var (exitCode, output) = Run("netsh", $"advfirewall firewall delete rule group=\"{Group}\"");
+        // Scoped to this group, so it can never remove a rule somebody else created. Missing
+        // rules are a success: the desired state is "none of ours exist".
+        var (exitCode, output) = RunPowerShell(
+            $"Remove-NetFirewallRule -Group '{Group}' -ErrorAction SilentlyContinue; exit 0");
 
-        // "No rules match" is a success from the caller's point of view: the desired state is
-        // "none of ours exist", and that is now true.
-        return exitCode == 0 || output.Contains("No rules match", StringComparison.OrdinalIgnoreCase)
+        return exitCode == 0
             ? (true, "CaYaTunnel firewall rules removed.")
             : (false, output);
     }
 
     public static bool RulesExist()
     {
-        var (exitCode, output) = Run("netsh", $"advfirewall firewall show rule name=all group=\"{Group}\"");
-        return exitCode == 0 && output.Contains(RulePrefix, StringComparison.OrdinalIgnoreCase);
+        var (exitCode, output) = RunPowerShell(
+            $"@(Get-NetFirewallRule -Group '{Group}' -ErrorAction SilentlyContinue).Count");
+
+        return exitCode == 0 && int.TryParse(output.Trim(), out var count) && count > 0;
     }
+
+    /// <summary>Single quotes are the escape in a PowerShell single-quoted string.</summary>
+    private static string Escape(string value) => value.Replace("'", "''");
 
     /// <summary>
     /// What would be opened, in plain terms. Shown before anything is changed so the operator
@@ -113,6 +122,9 @@ public static class FirewallManager
 
     private static (string, string, string) DedicatedUdp(ServerConfig config)
         => ("tunnel ports", "UDP", $"{config.TcpPortRangeStart}-{config.TcpPortRangeEnd}");
+
+    private static (int ExitCode, string Output) RunPowerShell(string script)
+        => Run("powershell.exe", $"-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command \"{script.Replace("\"", "\\\"")}\"");
 
     private static (int ExitCode, string Output) Run(string fileName, string arguments)
     {

@@ -72,7 +72,18 @@ public sealed partial class TunnelServer
                 break;
 
             default:
-                Log.Debug("gateway", $"{remote} sent something unrecognised on the shared port.");
+                // Anything that announced no destination goes to the tunnel that claimed the
+                // shared port, if one has. That is what lets a plain TCP service share the port
+                // too, and why only one of them can.
+                if (Registry.FindSharedPortTunnel(TransportProtocols.Tcp) is { } fallback)
+                {
+                    await ForwardAsync(fallback, stream, remote, cancellationToken).ConfigureAwait(false);
+                }
+                else
+                {
+                    Log.Debug("gateway", $"{remote} sent something unrecognised on the shared port.");
+                }
+
                 break;
         }
     }
@@ -125,6 +136,13 @@ public sealed partial class TunnelServer
                 StartPortListener(tunnel);
             }
 
+            // UDP is a separate namespace from TCP, so the shared UDP tunnel can use the same
+            // port number without conflicting with the control listener above it.
+            if (Registry.FindSharedPortTunnel(TransportProtocols.Udp) is not null)
+            {
+                StartSharedUdpListener(token);
+            }
+
             Log.Info("gateway", $"Single-port mode: agent links, HTTP, HTTPS and Minecraft all share {Config.ControlPort}.");
             return;
         }
@@ -170,8 +188,65 @@ public sealed partial class TunnelServer
     /// Binds whichever transports the tunnel asked for on its public port. A game server usually
     /// wants both on the same number, so they are managed together rather than as two tunnels.
     /// </summary>
+    /// <summary>
+    /// Serves the shared-port UDP tunnel on the control port's number. Separate from the TCP
+    /// listener because UDP and TCP are different protocols: the same number is a different
+    /// socket, and binding both is not a conflict.
+    /// </summary>
+    /// <summary>
+    /// Starts or stops the shared UDP listener to match whether a tunnel currently claims it.
+    /// Called whenever tunnels change, because a shared-port tunnel created after the gateway
+    /// started would otherwise have nothing listening for it.
+    /// </summary>
+    private void EnsureSharedUdpListener()
+    {
+        if (!Config.SinglePortMode || _publicShutdown is null)
+        {
+            return;
+        }
+
+        var wanted = Registry.FindSharedPortTunnel(TransportProtocols.Udp) is not null;
+        var running = _portListeners.ContainsKey(Config.ControlPort);
+
+        if (wanted && !running)
+        {
+            StartSharedUdpListener(_publicShutdown.Token);
+        }
+        else if (!wanted && running)
+        {
+            StopPortListener(Config.ControlPort);
+        }
+    }
+
+    private void StartSharedUdpListener(CancellationToken cancellationToken)
+    {
+        var port = Config.ControlPort;
+        if (_portListeners.ContainsKey(port))
+        {
+            return;
+        }
+
+        var listener = new PortListener(port);
+        if (!_portListeners.TryAdd(port, listener))
+        {
+            listener.Dispose();
+            return;
+        }
+
+        var udp = new UdpPortRouter(port, this, Log, () => Registry.FindSharedPortTunnel(TransportProtocols.Udp));
+        udp.Start(listener.Token);
+        listener.Udp = udp;
+    }
+
     private void StartPortListener(TunnelDefinition tunnel)
     {
+        // A tunnel riding the shared port has no listener of its own; the control port's
+        // classifier and the shared UDP listener already serve it.
+        if (tunnel.UseSharedPort)
+        {
+            return;
+        }
+
         if (_publicShutdown is null || tunnel.PublicPort is not { } port)
         {
             return;
@@ -267,7 +342,12 @@ public sealed partial class TunnelServer
             return;
         }
 
-        var listener = new TcpListener(IPAddress.Any, port);
+        // Exclusive on purpose. Windows otherwise lets this bind 0.0.0.0:443 while another
+        // service holds 443 on one specific address, and then splits traffic between them at
+        // random — the other service's visitors intermittently get this gateway's certificate.
+        // Refusing to start a listener is always better than quietly stealing half of someone
+        // else's traffic.
+        var listener = new TcpListener(IPAddress.Any, port) { ExclusiveAddressUse = true };
 
         try
         {
@@ -276,9 +356,13 @@ public sealed partial class TunnelServer
         }
         catch (SocketException ex)
         {
-            // A port already in use must not take the whole gateway down — the other listeners
-            // are still useful, and the operator gets a precise message.
-            Log.Error("gateway", $"Could not listen on {port} ({label}) — {ex.Message}");
+            // Loud, not just logged: a port that is already taken means this listener silently
+            // does nothing, and the operator needs to know which one and why.
+            var message = $"Port {port} ({label}) is already in use by something else, so it was not opened. "
+                + "Turn on single-port mode, or change the port, or stop whatever is using it.";
+
+            Log.Error("gateway", message);
+            ListenerFailed?.Invoke(message);
             return;
         }
 

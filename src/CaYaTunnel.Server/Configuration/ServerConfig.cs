@@ -53,7 +53,13 @@ public sealed class ServerConfig
     /// something in front (Cloudflare, a load balancer) maps it.
     /// </para>
     /// </summary>
-    public bool SinglePortMode { get; set; }
+    /// <remarks>
+    /// On by default. A gateway that helps itself to 80, 443 and 25565 on a server already
+    /// running something else is an ambush: the other service either stops working or ends up
+    /// sharing the port, and visitors get TLS errors from a certificate that was never meant for
+    /// them. Out of the box CaYaTunnel therefore touches exactly one port and nothing else.
+    /// </remarks>
+    public bool SinglePortMode { get; set; } = true;
 
     public bool EnableHttpRouter { get; set; } = true;
 

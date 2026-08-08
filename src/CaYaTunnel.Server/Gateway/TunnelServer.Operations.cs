@@ -109,6 +109,7 @@ public sealed partial class TunnelServer
         if (tunnel.Kind == TunnelKind.PortForward)
         {
             StartPortListener(tunnel);
+            EnsureSharedUdpListener();
         }
 
         Broadcast(ControlMessageTypes.TunnelAdded, tunnel);
@@ -123,6 +124,7 @@ public sealed partial class TunnelServer
         if (tunnel.Kind == TunnelKind.PortForward)
         {
             RestartPortListener(tunnel);
+            EnsureSharedUdpListener();
         }
 
         Broadcast(ControlMessageTypes.TunnelUpdated, tunnel);
@@ -130,9 +132,14 @@ public sealed partial class TunnelServer
 
     private void OnTunnelRemoved(TunnelDefinition tunnel)
     {
-        if (tunnel.Kind == TunnelKind.PortForward && tunnel.PublicPort is { } port)
+        if (tunnel.Kind == TunnelKind.PortForward)
         {
-            StopPortListener(port);
+            if (!tunnel.UseSharedPort && tunnel.PublicPort is { } port)
+            {
+                StopPortListener(port);
+            }
+
+            EnsureSharedUdpListener();
         }
 
         Broadcast(ControlMessageTypes.TunnelRemoved, tunnel);

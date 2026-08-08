@@ -252,6 +252,12 @@ public sealed class CreateTunnelRequest
 
     /// <summary>Port tunnels only: TCP, UDP, or both on the same public port.</summary>
     public TransportProtocols Transports { get; set; } = TransportProtocols.Tcp;
+
+    /// <summary>
+    /// Port tunnels only: use the gateway's shared port rather than allocating one. At most one
+    /// tunnel per transport can do this — see <see cref="Models.TunnelDefinition.UseSharedPort"/>.
+    /// </summary>
+    public bool UseSharedPort { get; set; }
 }
 
 public sealed class UpdateTunnelRequest

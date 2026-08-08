@@ -44,6 +44,11 @@ public class GatewayIntegrationTests : IAsyncLifetime
         _config = new ServerConfig
         {
             ServerName = "Test Gateway",
+
+            // This suite covers the separate-listener mode, so it says so rather than relying on
+            // the default — which is single-port, because that is the safe default on a server
+            // already running something on 80 or 443.
+            SinglePortMode = false,
             ControlPort = TestPorts.Free(),
             ControlBindAddress = "127.0.0.1",
             PublicHost = "127.0.0.1",

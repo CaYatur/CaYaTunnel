@@ -34,15 +34,21 @@ internal sealed class UdpPortRouter : IAsyncDisposable
     private readonly int _port;
     private readonly TunnelServer _server;
     private readonly GatewayLog _log;
+    private readonly Func<TunnelDefinition?> _resolveTunnel;
     private readonly CancellationTokenSource _shutdown = new();
 
     private UdpClient? _socket;
 
-    public UdpPortRouter(int port, TunnelServer server, GatewayLog log)
+    /// <param name="resolveTunnel">
+    /// Which tunnel this port serves. Passed in rather than looked up by port number, because the
+    /// shared-port listener is found by "who claimed the shared port", not by its number.
+    /// </param>
+    public UdpPortRouter(int port, TunnelServer server, GatewayLog log, Func<TunnelDefinition?>? resolveTunnel = null)
     {
         _port = port;
         _server = server;
         _log = log;
+        _resolveTunnel = resolveTunnel ?? (() => server.Registry.FindByPublicPort(port));
     }
 
     public Task? Task { get; private set; }
@@ -58,7 +64,11 @@ internal sealed class UdpPortRouter : IAsyncDisposable
 
         try
         {
-            _socket = new UdpClient(_port);
+            // Exclusive for the same reason as the TCP listeners: never share a port with
+            // another service and take part of its traffic.
+            _socket = new UdpClient();
+            _socket.Client.ExclusiveAddressUse = true;
+            _socket.Client.Bind(new IPEndPoint(IPAddress.Any, _port));
 
             // Without this, one ICMP port-unreachable from a previous datagram makes the next
             // ReceiveAsync throw on Windows and would kill the whole listener.
@@ -66,7 +76,15 @@ internal sealed class UdpPortRouter : IAsyncDisposable
         }
         catch (SocketException ex)
         {
-            _log.Error("udp", $"Could not listen on UDP {_port} — {ex.Message}");
+            // Access-denied here usually is not a permissions problem: Windows reserves whole
+            // UDP ranges for Hyper-V and WinNAT, and a port inside one cannot be bound by
+            // anybody. Saying so saves a long hunt for a firewall rule that was never the cause.
+            var reason = ex.SocketErrorCode == SocketError.AccessDenied
+                ? $"UDP port {_port} is inside a range Windows has reserved (see: netsh int ipv4 show excludedportrange protocol=udp). Pick a port outside it."
+                : $"Could not listen on UDP {_port} — {ex.Message}";
+
+            _log.Error("udp", reason);
+            _server.ReportListenerFailure(reason);
             return;
         }
 
@@ -125,7 +143,7 @@ internal sealed class UdpPortRouter : IAsyncDisposable
             return;
         }
 
-        var tunnel = _server.Registry.FindByPublicPort(_port);
+        var tunnel = _resolveTunnel();
         if (tunnel is null || !tunnel.ServesUdp)
         {
             return; // nothing registered for UDP here; silently drop, as a closed port would

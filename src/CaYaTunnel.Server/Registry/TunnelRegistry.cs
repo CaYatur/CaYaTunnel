@@ -285,10 +285,19 @@ public sealed class TunnelRegistry
                     break;
 
                 case TunnelKind.PortForward:
-                    tunnel.PublicPort = AllocatePublicPort(request.PublicPort, config);
                     tunnel.Transports = request.Transports == TransportProtocols.None
                         ? TransportProtocols.Tcp
                         : request.Transports;
+
+                    if (request.UseSharedPort)
+                    {
+                        ClaimSharedPort(tunnel, config);
+                    }
+                    else
+                    {
+                        tunnel.PublicPort = AllocatePublicPort(request.PublicPort, config);
+                    }
+
                     break;
 
                 default:
@@ -491,6 +500,53 @@ public sealed class TunnelRegistry
         }
 
         throw new TunnelValidationException("Could not find a free random subdomain. Try naming it yourself.");
+    }
+
+    /// <summary>
+    /// Puts a port tunnel on the gateway's shared port. Only one per transport can be there:
+    /// anything unrecognised arriving on that port has to go somewhere definite, and two
+    /// candidates would make it a coin toss.
+    /// </summary>
+    private void ClaimSharedPort(TunnelDefinition tunnel, ServerConfig config)
+    {
+        if (!config.SinglePortMode)
+        {
+            throw new TunnelValidationException(
+                "The shared port is only available in single-port mode. Turn it on in the server's listener settings first.");
+        }
+
+        foreach (var transport in new[] { TransportProtocols.Tcp, TransportProtocols.Udp })
+        {
+            if ((tunnel.Transports & transport) == 0)
+            {
+                continue;
+            }
+
+            var taken = _tunnels.Values.FirstOrDefault(t =>
+                t.UseSharedPort && (t.Transports & transport) != 0);
+
+            if (taken is not null)
+            {
+                throw new TunnelValidationException(
+                    $"'{taken.Name}' already uses the shared port for {transport.ToString().ToUpperInvariant()}. "
+                    + "Only one tunnel per transport can, because unrecognised traffic has to have one destination. Give this one its own port.");
+            }
+        }
+
+        tunnel.UseSharedPort = true;
+
+        // Recorded so the endpoint shown to users is the address they actually connect to.
+        tunnel.PublicPort = config.ControlPort;
+    }
+
+    /// <summary>The tunnel that receives unrecognised traffic on the shared port, if any.</summary>
+    public TunnelDefinition? FindSharedPortTunnel(TransportProtocols transport)
+    {
+        lock (_gate)
+        {
+            return _tunnels.Values.FirstOrDefault(t =>
+                t.UseSharedPort && t.Enabled && (t.Transports & transport) != 0)?.Clone();
+        }
     }
 
     private int AllocatePublicPort(int? requested, ServerConfig config)

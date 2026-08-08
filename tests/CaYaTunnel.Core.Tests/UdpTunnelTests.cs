@@ -111,6 +111,9 @@ public class UdpTunnelTests : IAsyncLifetime
         _config = new ServerConfig
         {
             ServerName = "UDP Test Gateway",
+
+            // Dedicated public ports, so the separate-listener mode is what is under test here.
+            SinglePortMode = false,
             ControlPort = TestPorts.Free(),
             ControlBindAddress = "127.0.0.1",
             PublicHost = "127.0.0.1",
@@ -411,13 +414,27 @@ internal sealed class DualEchoServer : IAsyncDisposable
 
     public static DualEchoServer Start()
     {
-        // Take a TCP port first, then bind UDP to the same number.
-        var tcp = new TcpListener(IPAddress.Loopback, 0);
-        tcp.Start();
-        var port = ((IPEndPoint)tcp.LocalEndpoint).Port;
+        // A number both protocols can actually bind. Windows reserves whole UDP ranges for
+        // Hyper-V and WinNAT, and binding one gives access-denied rather than address-in-use —
+        // so a port that TCP accepted says nothing about whether UDP will.
+        for (var attempt = 0; attempt < 40; attempt++)
+        {
+            var tcp = new TcpListener(IPAddress.Loopback, 0);
+            tcp.Start();
+            var port = ((IPEndPoint)tcp.LocalEndpoint).Port;
 
-        var udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, port));
-        return new DualEchoServer(tcp, udp, port);
+            try
+            {
+                var udp = new UdpClient(new IPEndPoint(IPAddress.Loopback, port));
+                return new DualEchoServer(tcp, udp, port);
+            }
+            catch (SocketException)
+            {
+                tcp.Stop();
+            }
+        }
+
+        throw new InvalidOperationException("Could not find a port free for both TCP and UDP.");
     }
 
     private async Task TcpLoopAsync(CancellationToken cancellationToken)

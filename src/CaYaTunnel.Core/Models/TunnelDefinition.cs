@@ -59,6 +59,18 @@ public sealed class TunnelDefinition
     /// </summary>
     public TransportProtocols Transports { get; set; } = TransportProtocols.Tcp;
 
+    /// <summary>
+    /// <see cref="TunnelKind.PortForward"/> only: ride the gateway's shared port instead of
+    /// taking one of its own.
+    /// <para>
+    /// A plain protocol says nothing about where it is going, so the gateway can only serve one
+    /// such tunnel per transport on a shared port — whatever arrives that is not a recognised
+    /// agent link, website or Minecraft handshake goes here. One is often all that is needed,
+    /// and it is the difference between forwarding one port and forwarding several.
+    /// </para>
+    /// </summary>
+    public bool UseSharedPort { get; set; }
+
     public bool ServesTcp => Kind != TunnelKind.PortForward || (Transports & TransportProtocols.Tcp) != 0;
 
     public bool ServesUdp => Kind == TunnelKind.PortForward && (Transports & TransportProtocols.Udp) != 0;
